@@ -1,0 +1,100 @@
+# Baseline cross-implementation scenarios (line-oriented)
+# This file is consumable by ScenarioLoader (see docs).
+# Blocks are separated by '---'. Keys are 'key=value'.
+# Recognized:
+#   suite, id
+#   attr.<name>=value   (opaque attributes)
+#   actor.<flag>=true|false
+#
+# Common attributes used by bridges:
+#   phys_channel: PC1 (variable), PC2 (fixed) as per NASA mibconfig
+#   vcid, mapid: managed identifiers
+#   frame_type: fixed|variable|truncated
+#   upid: USLP Protocol ID (0=MAP Packet, 4=Octet Stream, 5=MAPA SDU; OID handled by VCID 63)
+#   payload_length: requested application payload length (bytes)
+#   segmentation_flag: single|begin|middle|end (CR selection hint)
+#   has_fecf: true|false
+#   has_insert_zone: true|false
+
+suite=baseline
+id=baseline_map_packet_fixed_pc2
+attr.phys_channel=PC2
+attr.vcid=0
+attr.mapid=0
+attr.frame_type=fixed
+attr.upid=0
+attr.payload_profile=map_packet_nominal
+attr.payload_length=64
+attr.has_fecf=true
+attr.has_insert_zone=true
+actor.local_encode=true
+actor.local_decode=true
+actor.nasa_decode=true
+actor.python_decode=false
+# NASA PoC PC2 is fixed frames with IZ+FECF per mibconfig
+
+---
+suite=baseline
+id=baseline_map_packet_variable_pc1
+attr.phys_channel=PC1
+attr.vcid=62
+attr.mapid=1
+attr.frame_type=variable
+attr.upid=0
+attr.payload_profile=map_packet_nominal
+attr.payload_length=96
+attr.has_fecf=false
+attr.has_insert_zone=false
+actor.local_encode=true
+actor.nasa_decode=true
+actor.python_decode=false
+
+---
+suite=baseline
+id=baseline_mapa_fixed_pc1
+attr.phys_channel=PC1
+attr.vcid=0
+attr.mapid=15
+attr.frame_type=fixed
+attr.upid=5
+attr.payload_profile=mapa_boundary
+attr.payload_length=128
+attr.segmentation_flag=single
+attr.has_fecf=false
+attr.has_insert_zone=false
+actor.local_encode=true
+actor.nasa_decode=true
+actor.python_decode=false
+
+---
+suite=baseline
+id=baseline_octet_stream_variable_pc1
+attr.phys_channel=PC1
+attr.vcid=7
+attr.mapid=8
+attr.frame_type=variable
+attr.upid=4
+attr.payload_profile=octet_stream_2k
+attr.payload_length=512
+attr.segmentation_flag=begin
+attr.has_fecf=false
+attr.has_insert_zone=false
+actor.local_encode=true
+actor.nasa_decode=true
+actor.python_decode=false
+
+---
+suite=baseline
+id=baseline_truncated_demo_pc1
+attr.phys_channel=PC1
+attr.vcid=7
+attr.mapid=8
+attr.frame_type=truncated
+attr.upid=0
+attr.payload_profile=truncated_sample
+attr.payload_length=8
+attr.has_fecf=false
+attr.has_insert_zone=false
+actor.local_encode=true
+actor.nasa_decode=true
+actor.python_decode=false

@@ -1,0 +1,7 @@
+.cache/
+build/
+.PVS-Studio/
+
+*.kate-swp
+
+.idea/
