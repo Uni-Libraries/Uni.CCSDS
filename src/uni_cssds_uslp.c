@@ -1407,32 +1407,6 @@ uni_uslp_status_t uni_ccsds_uslp_build_frame(uni_uslp_context_t *context, uint8_
     th.first_header_ptr = 0;
     th.last_valid_ptr = 0;
 
-    /* DEBUG: emit build-time selection to validate interop mismatches
-     * Includes: fixed/variable, rule, UPID, VCF octets, IZ/OCF/FECF presence, SDU length, QoS */
-    fprintf(stderr,
-            "[USLP][build_frame] vc=%u map=%u fixed=%d rule=%u upid=%u vcf_octets=%zu iz=%zu ocf=%d fecf=%zu sdu=%zu expedited=%d\n",
-            vcid, map_id,
-            (int)fixed_length,
-            (unsigned)th.construction_rule,
-            (unsigned)th.upid,
-            vcf_octets,
-            insert_len,
-            (int)ocf_flag,
-            fecf_len,
-            sdu_len,
-            expedited_qos ? 1 : 0);
-    if (insert_len) {
-        if (vc->insert_pending_valid) {
-            fprintf(stderr, "[USLP][build_frame] insert_zone: pending_len=%zu\n", (size_t)vc->insert_pending_length);
-        } else {
-            fprintf(stderr, "[USLP][build_frame] insert_zone: idle_fill_len=%zu\n", insert_len);
-        }
-    }
-    if (th.construction_rule == UNI_USLP_TFDZ_RULE_0) {
-        fprintf(stderr, "[USLP][build_frame] packet: FHP=%u LVP=%u\n",
-                (unsigned)th.first_header_ptr, (unsigned)th.last_valid_ptr);
-    }
-
     /* Determine TFDZ length to copy (room will be computed after emitting TFDF header) */
     size_t tfdz_copy_len = sdu_len;
 
@@ -1816,8 +1790,6 @@ uni_uslp_status_t uni_ccsds_uslp_build_truncated(uni_uslp_context_t *context, ui
         const uint8_t dbg_rule = (uint8_t)UNI_USLP_TFDZ_RULE_7;
         const uint8_t dbg_upid = 0x00u;
         frame_buffer[off++] = (uint8_t)((dbg_rule << 5) | (dbg_upid & 0x1Fu));
-        fprintf(stderr, "[USLP][build_truncated] vc=%u tlen=%u rule=%u upid=%u tfdz_len=%zu\n",
-                vcid, (unsigned)tlen, (unsigned)dbg_rule, (unsigned)dbg_upid, tfdz_len);
     }
 
     /* TFDZ: copy MAPA SDU */
