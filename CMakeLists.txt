@@ -47,7 +47,7 @@ target_sources(uni_ccsds PRIVATE
 target_include_directories(uni_ccsds PUBLIC include)
 
 set_target_properties(uni_ccsds PROPERTIES
-    C_STANDARD 23
+    C_STANDARD 17
     C_STANDARD_REQUIRED ON
     C_EXTENSIONS OFF
 )
