@@ -17,6 +17,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "uni_ccsds_export.h"
+
 
 
 //
@@ -943,7 +945,7 @@ typedef void (*uni_uslp_mcf_tx_cb_t)(
  * @param params Managed parameters
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_init(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_init(
     uni_uslp_context_t *context,
     uint16_t scid,
     const uni_uslp_managed_params_t *params
@@ -955,7 +957,7 @@ uni_uslp_status_t uni_ccsds_uslp_init(
  * @param context Context to reset
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_reset(uni_uslp_context_t *context);
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_reset(uni_uslp_context_t *context);
 
 /**
  * @brief Free USLP context resources
@@ -963,7 +965,7 @@ uni_uslp_status_t uni_ccsds_uslp_reset(uni_uslp_context_t *context);
  * @param context Context to free
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_free(uni_uslp_context_t *context);
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_free(uni_uslp_context_t *context);
 
 /**
  * @brief Set working buffer for in-place transformations (e.g., SDLS ProcessSecurity on RX)
@@ -979,7 +981,7 @@ uni_uslp_status_t uni_ccsds_uslp_free(uni_uslp_context_t *context);
  * @param work_buffer_size Size of the buffer in bytes
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_set_work_buffer(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_set_work_buffer(
     uni_uslp_context_t *context,
     uint8_t *work_buffer,
     size_t work_buffer_size
@@ -997,7 +999,7 @@ uni_uslp_status_t uni_ccsds_uslp_set_work_buffer(
  * @param params VC-specific parameters
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_configure_vc(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_configure_vc(
     uni_uslp_context_t *context,
     uint8_t vcid,
     const uni_uslp_managed_params_t *params
@@ -1013,7 +1015,7 @@ uni_uslp_status_t uni_ccsds_uslp_configure_vc(
  * @param params MAP-specific parameters
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_configure_map(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_configure_map(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1030,7 +1032,7 @@ uni_uslp_status_t uni_ccsds_uslp_configure_map(
  * @param policy Multiplexing policy
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_set_mux_policy(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_set_mux_policy(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1045,7 +1047,7 @@ uni_uslp_status_t uni_ccsds_uslp_set_mux_policy(
  * @param config SDLS configuration
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_configure_sdls(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_configure_sdls(
     uni_uslp_context_t *context,
     uint8_t vcid,
     const uni_uslp_sdls_config_t *config
@@ -1059,7 +1061,7 @@ uni_uslp_status_t uni_ccsds_uslp_configure_sdls(
  * Get a copy of VC managed parameters, including USLP-132..USLP-144 fields.
  * Returns UNI_USLP_ERROR_INVALID_PARAM if VC not configured.
  */
-uni_uslp_status_t uni_ccsds_uslp_get_vc_params(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_get_vc_params(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uni_uslp_managed_params_t *out_params
@@ -1068,7 +1070,7 @@ uni_uslp_status_t uni_ccsds_uslp_get_vc_params(
 /**
  * Get repetition configuration counts (USLP-141/USLP-142) for a VC.
  */
-uni_uslp_status_t uni_ccsds_uslp_get_repetition_counts(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_get_repetition_counts(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t *repetitions_seq,
@@ -1089,7 +1091,7 @@ uni_uslp_status_t uni_ccsds_uslp_get_repetition_counts(
  * @param user_data User data for callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_sdu_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_sdu_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1106,7 +1108,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_sdu_callback(
  * @param user_data User data for callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_ocf_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_ocf_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uni_uslp_ocf_callback_t callback,
@@ -1128,7 +1130,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_ocf_callback(
  * @param user_data User pointer
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_ocf2_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_ocf2_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uni_uslp_ocf2_callback_t callback,
@@ -1144,7 +1146,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_ocf2_callback(
  * @param user_data User data for callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_insert_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_insert_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uni_uslp_insert_callback_t callback,
@@ -1168,7 +1170,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_insert_callback(
  * @param user_data User data for callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_insert2_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_insert2_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uni_uslp_insert2_callback_t callback,
@@ -1183,7 +1185,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_insert2_callback(
  * @param user_data User data for callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_idle_filler_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_idle_filler_callback(
     uni_uslp_context_t *context,
     uni_uslp_idle_filler_callback_t callback,
     void *user_data
@@ -1206,7 +1208,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_idle_filler_callback(
  * @param user_data User data for callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_octet_stream_notify_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_octet_stream_notify_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1227,7 +1229,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_octet_stream_notify_callback(
  * @param user_data Opaque pointer passed to the callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_mapa_notify_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_mapa_notify_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1244,7 +1246,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_mapa_notify_callback(
  * @param user_data User data for callbacks
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_sdls_callbacks(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_sdls_callbacks(
     uni_uslp_context_t *context,
     uni_uslp_sdls_apply_callback_t apply_callback,
     uni_uslp_sdls_process_callback_t process_callback,
@@ -1264,7 +1266,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_sdls_callbacks(
  * @param user_data Opaque pointer passed to the callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_mapp_notify_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_mapp_notify_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1285,7 +1287,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_mapp_notify_callback(
  * @param user_data Opaque pointer passed to the callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_vca_notify_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_vca_notify_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1306,7 +1308,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_vca_notify_callback(
  * @param user_data Opaque pointer passed to the callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_mapp_indication_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_mapp_indication_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1326,7 +1328,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_mapp_indication_callback(
  * @param user_data Opaque pointer passed to the callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_vcp_notify_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_vcp_notify_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uni_uslp_vcp_notify_cb_t callback,
@@ -1345,7 +1347,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_vcp_notify_callback(
  * @param user_data User data pointer
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_vcp_indication_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_vcp_indication_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uni_uslp_vcp_indication_cb_t callback,
@@ -1368,7 +1370,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_vcp_indication_callback(
  * @param user_data User data for callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_vcf_indication_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_vcf_indication_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uni_uslp_vcf_indication_cb_t callback,
@@ -1390,7 +1392,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_vcf_indication_callback(
  * @param user_data User data for callback
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_mcf_indication_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_mcf_indication_callback(
     uni_uslp_context_t *context,
     uni_uslp_mcf_indication_cb_t callback,
     void *user_data
@@ -1414,7 +1416,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_mcf_indication_callback(
  * @param user_data Opaque user pointer
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_vcf_tx_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_vcf_tx_callback(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uni_uslp_vcf_tx_cb_t callback,
@@ -1433,7 +1435,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_vcf_tx_callback(
  * @param user_data Opaque user pointer
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_mcf_tx_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_mcf_tx_callback(
     uni_uslp_context_t *context,
     uni_uslp_mcf_tx_cb_t callback,
     void *user_data
@@ -1451,7 +1453,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_mcf_tx_callback(
  * @param user_data Opaque user pointer
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_directive_notify_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_directive_notify_callback(
     uni_uslp_context_t *context,
     uni_uslp_directive_notify_cb_t callback,
     void *user_data
@@ -1467,7 +1469,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_directive_notify_callback(
  * @param user_data Opaque user pointer
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_register_async_notify_callback(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_async_notify_callback(
     uni_uslp_context_t *context,
     uni_uslp_async_notify_cb_t callback,
     void *user_data
@@ -1495,7 +1497,7 @@ uni_uslp_status_t uni_ccsds_uslp_register_async_notify_callback(
  * @param sdu_id Optional accounting identifier (not transmitted)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_send_packet_ex(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_send_packet_ex(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1523,7 +1525,7 @@ uni_uslp_status_t uni_ccsds_uslp_send_packet_ex(
  * @param sdu_id Optional accounting identifier (not transmitted)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_send_vcp_ex(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_send_vcp_ex(
     uni_uslp_context_t *context,
     uint8_t vcid,
     const uint8_t *packet_data,
@@ -1543,7 +1545,7 @@ uni_uslp_status_t uni_ccsds_uslp_send_vcp_ex(
  * @param sdu_length SDU length
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_send_mapa(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_send_mapa(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1568,7 +1570,7 @@ uni_uslp_status_t uni_ccsds_uslp_send_mapa(
  * @param sdu_id Optional accounting identifier (not transmitted)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_send_vca_ex(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_send_vca_ex(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1595,7 +1597,7 @@ uni_uslp_status_t uni_ccsds_uslp_send_vca_ex(
  * @param sdu_id Optional accounting identifier (not transmitted)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_send_octet_stream_ex(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_send_octet_stream_ex(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1613,7 +1615,7 @@ uni_uslp_status_t uni_ccsds_uslp_send_octet_stream_ex(
  * @param ocf OCF data
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_send_ocf(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_send_ocf(
     uni_uslp_context_t *context,
     uint8_t vcid,
     const uni_uslp_ocf_t *ocf
@@ -1628,7 +1630,7 @@ uni_uslp_status_t uni_ccsds_uslp_send_ocf(
  * @param insert_length Insert Zone length
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_send_insert(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_send_insert(
     uni_uslp_context_t *context,
     uint8_t vcid,
     const uint8_t *insert_data,
@@ -1649,7 +1651,7 @@ uni_uslp_status_t uni_ccsds_uslp_send_insert(
  * @param frame_length Length of the frame in octets
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_vcf_request(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_vcf_request(
     uni_uslp_context_t *context,
     uint8_t vcid,
     const uint8_t *frame,
@@ -1669,7 +1671,7 @@ uni_uslp_status_t uni_ccsds_uslp_vcf_request(
  * @param frame_length Length of the frame in octets
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_mcf_request(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_mcf_request(
     uni_uslp_context_t *context,
     uint32_t mcid,
     const uint8_t *frame,
@@ -1692,7 +1694,7 @@ uni_uslp_status_t uni_ccsds_uslp_mcf_request(
  * @param directive_qualifier USLP-58
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_directive_request(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_directive_request(
     uni_uslp_context_t *context,
     bool is_cop1,
     uint8_t vcid,
@@ -1715,7 +1717,7 @@ uni_uslp_status_t uni_ccsds_uslp_directive_request(
  * @param notification_qualifier USLP-60
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_async_notify(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_async_notify(
     uni_uslp_context_t *context,
     bool is_cop1,
     uint8_t vcid,
@@ -1738,7 +1740,7 @@ uni_uslp_status_t uni_ccsds_uslp_async_notify(
  * @param frame_length Frame buffer size (in), actual frame length (out)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_build_frame(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_build_frame(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t map_id,
@@ -1767,7 +1769,7 @@ uni_uslp_status_t uni_ccsds_uslp_build_frame(
  * @param frame_length Frame buffer size (in), actual frame length (out)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_build_oid(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_build_oid(
     uni_uslp_context_t *context,
     uint8_t *frame_buffer,
     size_t *frame_length
@@ -1782,7 +1784,7 @@ uni_uslp_status_t uni_ccsds_uslp_build_oid(
  * @param frame_length Frame buffer size (in), actual frame length (out)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_build_truncated(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_build_truncated(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t *frame_buffer,
@@ -1801,7 +1803,7 @@ uni_uslp_status_t uni_ccsds_uslp_build_truncated(
  * @param frame_length Frame data length
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_accept_frame(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_accept_frame(
     uni_uslp_context_t *context,
     const uint8_t *frame_data,
     size_t frame_length
@@ -1821,7 +1823,7 @@ uni_uslp_status_t uni_ccsds_uslp_accept_frame(
  * @param loss_signaled true if the C&S layer signaled loss prior to this frame
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_set_rx_cs_loss_signaled(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_set_rx_cs_loss_signaled(
     uni_uslp_context_t *context,
     bool loss_signaled
 );
@@ -1837,7 +1839,7 @@ uni_uslp_status_t uni_ccsds_uslp_set_rx_cs_loss_signaled(
  * @param lfsr_state LFSR state (in/out)
  * @return Next LFSR value
  */
-uint32_t uni_ccsds_uslp_oid_lfsr_next(uint32_t *lfsr_state);
+UNI_CCSDS_EXPORT uint32_t uni_ccsds_uslp_oid_lfsr_next(uint32_t *lfsr_state);
 
 /**
  * @brief Pack non-truncated Primary Header to buffer (MSB-first bit numbering)
@@ -1851,7 +1853,7 @@ uint32_t uni_ccsds_uslp_oid_lfsr_next(uint32_t *lfsr_state);
  * @param bytes_written Bytes written to buffer (out)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_primary_header_pack(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_primary_header_pack(
     const uni_uslp_primary_header_t *header,
     uint8_t *buffer,
     size_t buffer_size,
@@ -1869,7 +1871,7 @@ uni_uslp_status_t uni_ccsds_uslp_primary_header_pack(
  * @param bytes_read Bytes consumed from buffer (out)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_primary_header_unpack(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_primary_header_unpack(
     const uint8_t *buffer,
     size_t buffer_size,
     uni_uslp_primary_header_t *header,
@@ -1885,7 +1887,7 @@ uni_uslp_status_t uni_ccsds_uslp_primary_header_unpack(
  * @param bytes_written Bytes written (out)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_tfdf_header_pack(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_tfdf_header_pack(
     const uni_uslp_tfdf_header_t *header,
     uint8_t *buffer,
     size_t buffer_size,
@@ -1901,7 +1903,7 @@ uni_uslp_status_t uni_ccsds_uslp_tfdf_header_pack(
  * @param bytes_read Bytes read (out)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_tfdf_header_unpack(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_tfdf_header_unpack(
     const uint8_t *buffer,
     size_t buffer_size,
     uni_uslp_tfdf_header_t *header,
@@ -1918,7 +1920,7 @@ uni_uslp_status_t uni_ccsds_uslp_tfdf_header_unpack(
  * @param seed Initial seed value (must be non-zero)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_oid_lfsr_init(uint32_t *lfsr_state, uint32_t seed);
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_oid_lfsr_init(uint32_t *lfsr_state, uint32_t seed);
 
 /**
  * @brief Fill buffer with OID LFSR data
@@ -1928,7 +1930,7 @@ uni_uslp_status_t uni_ccsds_uslp_oid_lfsr_init(uint32_t *lfsr_state, uint32_t se
  * @param length Number of bytes to fill
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_oid_lfsr_fill(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_oid_lfsr_fill(
     uint32_t *lfsr_state,
     uint8_t *buffer,
     size_t length
@@ -1940,7 +1942,7 @@ uni_uslp_status_t uni_ccsds_uslp_oid_lfsr_fill(
  *
  * @return true if self-test passes, false otherwise
  */
-bool uni_ccsds_uslp_oid_lfsr_self_test(void);
+UNI_CCSDS_EXPORT bool uni_ccsds_uslp_oid_lfsr_self_test(void);
 
 /**
  * @brief Get status code description string
@@ -1948,7 +1950,7 @@ bool uni_ccsds_uslp_oid_lfsr_self_test(void);
  * @param status Status code
  * @return Status description string
  */
-const char* uni_ccsds_uslp_status_string(uni_uslp_status_t status);
+UNI_CCSDS_EXPORT const char* uni_ccsds_uslp_status_string(uni_uslp_status_t status);
 
 
 /* ========================================================================== */
@@ -1975,7 +1977,7 @@ const char* uni_ccsds_uslp_status_string(uni_uslp_status_t status);
  * @param policy Policy parameters (priority/weight/burst)
  * @return Status code
  */
-uni_uslp_status_t uni_ccsds_uslp_set_vc_mux_policy(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_set_vc_mux_policy(
     uni_uslp_context_t *context,
     uint8_t vcid,
     const uni_uslp_mux_policy_t *policy
@@ -1991,7 +1993,7 @@ uni_uslp_status_t uni_ccsds_uslp_set_vc_mux_policy(
  * @param out_vcid Next VCID selected (valid when SUCCESS)
  * @return UNI_USLP_SUCCESS when a VC is selected, UNI_USLP_ERROR_NOT_FOUND if none ready
  */
-uni_uslp_status_t uni_ccsds_uslp_select_next_vc(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_select_next_vc(
     uni_uslp_context_t *context,
     uint8_t *out_vcid
 );
@@ -2007,7 +2009,7 @@ uni_uslp_status_t uni_ccsds_uslp_select_next_vc(
  * @param out_map_id Next MAP ID selected (valid when SUCCESS)
  * @return UNI_USLP_SUCCESS when a MAP is selected, UNI_USLP_ERROR_NOT_FOUND if none ready
  */
-uni_uslp_status_t uni_ccsds_uslp_select_next_map(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_select_next_map(
     uni_uslp_context_t *context,
     uint8_t vcid,
     uint8_t *out_map_id
@@ -2026,7 +2028,7 @@ uni_uslp_status_t uni_ccsds_uslp_select_next_map(
  * @param out_map_id (optional) returns MAP ID selected
  * @return UNI_USLP_SUCCESS if a frame was built, UNI_USLP_ERROR_NOT_FOUND if no SDU pending
  */
-uni_uslp_status_t uni_ccsds_uslp_build_next_frame(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_build_next_frame(
     uni_uslp_context_t *context,
     uint8_t *frame_buffer,
     size_t *frame_length,
@@ -2054,10 +2056,10 @@ uni_uslp_status_t uni_ccsds_uslp_build_next_frame(
  */
 
 /* Register the built-in SDLS engine callbacks on the context */
-uni_uslp_status_t uni_ccsds_uslp_register_builtin_sdls(uni_uslp_context_t* context);
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_builtin_sdls(uni_uslp_context_t* context);
 
 /* Exposed for tests and advanced integration: built-in callbacks */
-uni_uslp_status_t uni_ccsds_uslp_sdls_builtin_apply(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_builtin_apply(
     uni_uslp_context_t *context,
     uint8_t vcid,
     const uint8_t *input_frame,
@@ -2068,7 +2070,7 @@ uni_uslp_status_t uni_ccsds_uslp_sdls_builtin_apply(
     void *user_data
 );
 
-uni_uslp_status_t uni_ccsds_uslp_sdls_builtin_process(
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_builtin_process(
     uni_uslp_context_t *context,
     uint8_t vcid,
     const uint8_t *input_frame,

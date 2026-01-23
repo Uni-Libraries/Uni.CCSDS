@@ -35,6 +35,10 @@ endif()
 
 add_library(uni_ccsds)
 
+include(GenerateExportHeader)
+generate_export_header(uni_ccsds)
+target_include_directories(uni_ccsds PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
 target_sources(uni_ccsds PRIVATE
     src/uni_ccsds_lfsr_oid.c
     src/uni_ccsds_uslp_primary_header.c
