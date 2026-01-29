@@ -62,27 +62,6 @@ static void configure_common_varlen_no_fecf(uni_uslp_managed_params_t& p)
 
 TEST_CASE("SDLS AES-GCM: encrypt/decrypt MAPA round-trip; tamper and replay detection", "[sdls][aead][aes-gcm]")
 {
-    // Preflight: verify backend AES-GCM is operational; if not, skip test gracefully.
-    {
-        const uint8_t key[16] = {
-            0x00,0x11,0x22,0x33, 0x44,0x55,0x66,0x77,
-            0x88,0x99,0xAA,0xBB, 0xCC,0xDD,0xEE,0xFF
-        };
-        const uint8_t iv[12]  = { 0 };
-        const uint8_t pt[4]   = { 1,2,3,4 };
-        uint8_t ct[4]         = { 0 };
-        uint8_t tag[16]       = { 0 };
-        int rc = uni_crypto_aead_encrypt(UNI_CRYPTO_AEAD_ALG_AES_GCM,
-                                         key, sizeof(key),
-                                         iv, sizeof(iv),
-                                         NULL, 0,
-                                         pt, sizeof(pt),
-                                         ct, tag, sizeof(tag));
-        if (rc != 0) {
-            // Backend lacks AES-GCM runtime; skip this test.
-            return;
-        }
-    }
     // Managed params (variable-length, no FECF)
     uni_uslp_managed_params_t p{};
     configure_common_varlen_no_fecf(p);
@@ -152,4 +131,91 @@ TEST_CASE("SDLS AES-GCM: encrypt/decrypt MAPA round-trip; tamper and replay dete
     std::vector<uint8_t> tampered = frame;
     tampered.back() ^= 0x01;
     REQUIRE(uni_ccsds_uslp_accept_frame(&ctx, tampered.data(), tampered.size()) == UNI_USLP_ERROR_SDLS_FAILURE);
+}
+
+TEST_CASE("SDLS AES-GCM: MAPA secured frame round-trip using separate TX/RX contexts (buffer+key only)", "[sdls][aead][aes-gcm][no-reuse]")
+{
+    // Common managed params (variable-length, no FECF)
+    uni_uslp_managed_params_t p{};
+    configure_common_varlen_no_fecf(p);
+
+    // Shared key material (caller-owned; passed into both contexts independently)
+    static const uint8_t aead_key_128[] = {
+        0x00,0x11,0x22,0x33, 0x44,0x55,0x66,0x77,
+        0x88,0x99,0xAA,0xBB, 0xCC,0xDD,0xEE,0xFF
+    };
+
+    const uint8_t VC = 7;
+    const uint8_t MAP = 3;
+    const uint16_t SCID = 0x6161;
+
+    // -------------------- TX: build secured frame --------------------
+    uni_uslp_context_t tx{};
+    REQUIRE(uni_ccsds_uslp_init(&tx, SCID, &p) == UNI_USLP_SUCCESS);
+    REQUIRE(uni_ccsds_uslp_register_builtin_sdls(&tx) == UNI_USLP_SUCCESS);
+    REQUIRE(uni_ccsds_uslp_configure_vc(&tx, VC, &p) == UNI_USLP_SUCCESS);
+    REQUIRE(uni_ccsds_uslp_configure_map(&tx, VC, MAP, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);
+
+    uni_uslp_sdls_config_t sdls_tx{};
+    sdls_tx.enabled = true;
+    sdls_tx.spi = 3;
+    sdls_tx.iv_length = 12;
+    sdls_tx.mac_length = 16;
+    sdls_tx.authentication_only = false;
+    sdls_tx.encryption_enabled = true;
+    sdls_tx.suite = UNI_USLP_SDLS_SUITE_AES_GCM;
+    sdls_tx.key = aead_key_128;
+    sdls_tx.key_length = sizeof(aead_key_128);
+    sdls_tx.anti_replay_enabled = true;
+    sdls_tx.anti_replay_window = 64;
+    sdls_tx.sec_header_present = true;
+    sdls_tx.sec_trailer_present = true;
+    sdls_tx.sec_header_length = 9;   // SPI(1)+SN(8)
+    sdls_tx.sec_trailer_length = 16; // tag length
+    REQUIRE(uni_ccsds_uslp_configure_sdls(&tx, VC, &sdls_tx) == UNI_USLP_SUCCESS);
+
+    const std::vector<uint8_t> sdu = { 0xFE,0xED,0xFA,0xCE,0x12,0x34,0x56,0x78,0x9A };
+    REQUIRE(uni_ccsds_uslp_send_mapa(&tx, VC, MAP, sdu.data(), sdu.size()) == UNI_USLP_SUCCESS);
+
+    std::vector<uint8_t> frame(1024);
+    size_t flen = frame.size();
+    REQUIRE(uni_ccsds_uslp_build_frame(&tx, VC, MAP, frame.data(), &flen) == UNI_USLP_SUCCESS);
+    frame.resize(flen);
+
+    // -------------------- RX: accept secured frame --------------------
+    uni_uslp_context_t rx{};
+    REQUIRE(uni_ccsds_uslp_init(&rx, SCID, &p) == UNI_USLP_SUCCESS);
+    REQUIRE(uni_ccsds_uslp_register_builtin_sdls(&rx) == UNI_USLP_SUCCESS);
+
+    // RX SDLS ProcessSecurity needs a per-context work buffer (no sharing with TX)
+    std::vector<uint8_t> rx_work(4096);
+    REQUIRE(uni_ccsds_uslp_set_work_buffer(&rx, rx_work.data(), rx_work.size()) == UNI_USLP_SUCCESS);
+
+    REQUIRE(uni_ccsds_uslp_configure_vc(&rx, VC, &p) == UNI_USLP_SUCCESS);
+    REQUIRE(uni_ccsds_uslp_configure_map(&rx, VC, MAP, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);
+
+    uni_uslp_sdls_config_t sdls_rx{};
+    sdls_rx.enabled = true;
+    sdls_rx.spi = 3;
+    sdls_rx.iv_length = 12;
+    sdls_rx.mac_length = 16;
+    sdls_rx.authentication_only = false;
+    sdls_rx.encryption_enabled = true;
+    sdls_rx.suite = UNI_USLP_SDLS_SUITE_AES_GCM;
+    sdls_rx.key = aead_key_128;
+    sdls_rx.key_length = sizeof(aead_key_128);
+    sdls_rx.anti_replay_enabled = true;
+    sdls_rx.anti_replay_window = 64;
+    sdls_rx.sec_header_present = true;
+    sdls_rx.sec_trailer_present = true;
+    sdls_rx.sec_header_length = 9;
+    sdls_rx.sec_trailer_length = 16;
+    REQUIRE(uni_ccsds_uslp_configure_sdls(&rx, VC, &sdls_rx) == UNI_USLP_SUCCESS);
+
+    CapVer cap{};
+    REQUIRE(uni_ccsds_uslp_register_sdu_callback(&rx, VC, MAP, sdu_capture_cb, &cap) == UNI_USLP_SUCCESS);
+
+    REQUIRE(uni_ccsds_uslp_accept_frame(&rx, frame.data(), frame.size()) == UNI_USLP_SUCCESS);
+    REQUIRE(cap.data == sdu);
+    REQUIRE(cap.ver == UNI_USLP_VERIF_SUCCESS);
 }
