@@ -436,6 +436,7 @@ typedef struct {
     
     /* MAP Parameters */
     bool     fecf_capability;           /**< FECF capability (when true, FECF is present on the wire) */
+    bool     fecf_check;                /* when true FECF must be chedked */
     uni_uslp_fecf_tx_mode_t fecf_tx_mode; /**< FECF generation mode on TX (default: INTERNAL) */
     bool     segmentation_permitted;    /**< Segmentation permitted */
     bool     blocking_permitted;        /**< Blocking permitted */

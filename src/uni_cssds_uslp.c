@@ -1912,7 +1912,7 @@ uni_uslp_status_t uni_ccsds_uslp_accept_frame(uni_uslp_context_t *context, const
 
     /* FECF verification if present on the physical channel */
     const size_t fecf_len = fecf_length_if_present(context);
-    if (fecf_len) {
+    if (fecf_len && context->params.fecf_check) {
         if (frame_length < fecf_len) return UNI_USLP_ERROR_INVALID_FRAME;
         if (!uni_crypto_crc16_ccitt_verify(frame_data, frame_length)) {
             return UNI_USLP_ERROR_CRC_MISMATCH;
