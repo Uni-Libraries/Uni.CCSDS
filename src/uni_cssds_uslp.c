@@ -190,6 +190,7 @@ uni_uslp_status_t uni_ccsds_uslp_reset(uni_uslp_context_t *context)
 
     /* Reset counters and transient state, keep configuration */
     memset(&context->mc_state, 0, sizeof(context->mc_state));
+    memset(context->reassembly, 0, sizeof(context->reassembly));
 
     for (size_t v = 0; v < UNI_USLP_MAX_VIRTUAL_CHANNELS; ++v) {
         uni_uslp_vc_state_t* vc = &context->vcs[v];
@@ -211,6 +212,7 @@ uni_uslp_status_t uni_ccsds_uslp_reset(uni_uslp_context_t *context)
         vc->out_of_order_frames = 0u;
         vc->wraps = 0u;
         vc->vcf_frames_with_field = 0u;
+        memset(&vc->sdls_rt, 0, sizeof(vc->sdls_rt));
 
         /* Clear schedulers (USLP-96/USLP-99) */
         vc->sched_last_map_rr = 0xFF; /* none */
