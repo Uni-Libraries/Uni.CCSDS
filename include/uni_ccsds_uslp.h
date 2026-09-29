@@ -7,6 +7,10 @@
 extern "C" {
 #endif
 
+/** Largest supported SDLS anti-replay window, in frames. */
+#define UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW 4096u
+
+
     
 //
 // Includes
@@ -479,7 +483,9 @@ typedef struct {
 
     /* Anti-replay configuration */
     bool     anti_replay_enabled;       /**< Enable sliding window anti-replay */
-    uint8_t  anti_replay_window;        /**< Window size (entries, up to 64 recommended) */
+    uint16_t anti_replay_window;        /**< Frames an out-of-order SN may lag the highest one and still be accepted once
+                                             (0 = 64, capped at UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW). Diversity receivers
+                                             that merge several carriers need a window covering the carriers' relative lag. */
 
     /* USLP Additional Managed Parameters with SDLS Option (§6.6.2; USLP-176..179) */
     bool     sec_header_present;        /**< Presence of Security Header (USLP-176) */

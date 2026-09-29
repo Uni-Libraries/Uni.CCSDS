@@ -60,45 +60,64 @@ static inline uint64_t be_load_u64(const uint8_t in[8])
 }
 
 /* Anti-replay window update. Returns true if acceptable (not replay/too old), false otherwise.
- * Window size W up to 64 (bits of bitmap). LSB of bitmap corresponds to highest SN. */
+ *
+ * Accepted SNs are recorded in a ring bitmap indexed by SN modulo the maximum window. An SN above
+ * the highest one advances the window (clearing the slots it passes); an older SN is accepted
+ * once as long as it lags the highest by less than the configured window. */
+static bool sdls_bit_test_and_set(uint64_t* bitmap, uint64_t sn)
+{
+    const uint64_t slot = sn % UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW;
+    const uint64_t mask = 1ull << (slot % 64u);
+    uint64_t* word = &bitmap[slot / 64u];
+    const bool was_set = (*word & mask) != 0u;
+    *word |= mask;
+    return was_set;
+}
+
+static void sdls_bit_clear(uint64_t* bitmap, uint64_t sn)
+{
+    const uint64_t slot = sn % UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW;
+    bitmap[slot / 64u] &= ~(1ull << (slot % 64u));
+}
+
 static bool sdls_window_accept_and_update(uni_uslp_vc_state_t* vc, const uni_uslp_sdls_config_t* cfg, uint64_t sn)
 {
     if (!cfg->anti_replay_enabled) {
         return true;
     }
-    const uint8_t W = (cfg->anti_replay_window == 0) ? 64u : (cfg->anti_replay_window > 64u ? 64u : cfg->anti_replay_window);
+    const uint64_t window = (cfg->anti_replay_window == 0u) ? 64u
+                          : (cfg->anti_replay_window > UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW ? UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW
+                                                                                            : cfg->anti_replay_window);
+    uint64_t* bitmap = vc->sdls_rt.rx_window_bitmap;
+    const size_t words = sizeof(vc->sdls_rt.rx_window_bitmap) / sizeof(vc->sdls_rt.rx_window_bitmap[0]);
 
     if (!vc->sdls_rt.rx_initialized) {
         vc->sdls_rt.rx_initialized = true;
         vc->sdls_rt.rx_highest_sn = sn;
-        vc->sdls_rt.rx_window_bitmap = 1ull; /* mark highest seen */
+        memset(bitmap, 0, words * sizeof(uint64_t));
+        (void)sdls_bit_test_and_set(bitmap, sn);
         return true;
     }
 
-    uint64_t high = vc->sdls_rt.rx_highest_sn;
+    const uint64_t high = vc->sdls_rt.rx_highest_sn;
     if (sn > high) {
-        uint64_t diff = sn - high;
-        if (diff >= 64u) {
-            vc->sdls_rt.rx_window_bitmap = 1ull; /* clear and set current */
+        const uint64_t advance = sn - high;
+        if (advance >= UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW) {
+            memset(bitmap, 0, words * sizeof(uint64_t));
         } else {
-            vc->sdls_rt.rx_window_bitmap = (vc->sdls_rt.rx_window_bitmap << diff) | 1ull;
+            for (uint64_t next = high + 1u; next < sn; ++next) {
+                sdls_bit_clear(bitmap, next);
+            }
+            sdls_bit_clear(bitmap, sn);
         }
         vc->sdls_rt.rx_highest_sn = sn;
-        return true;
-    } else {
-        uint64_t offset = high - sn;
-        if (offset >= W) {
-            /* too old */
-            return false;
-        }
-        uint64_t mask = (1ull << offset);
-        if (vc->sdls_rt.rx_window_bitmap & mask) {
-            /* duplicate */
-            return false;
-        }
-        vc->sdls_rt.rx_window_bitmap |= mask;
+        (void)sdls_bit_test_and_set(bitmap, sn);
         return true;
     }
+    if (high - sn >= window) {
+        return false; /* too old */
+    }
+    return !sdls_bit_test_and_set(bitmap, sn); /* false: duplicate */
 }
 
 /* IV derivation for AEAD: 12 bytes = 0x00000000 || SN_be_8 */

@@ -219,3 +219,79 @@ TEST_CASE("SDLS AES-GCM: MAPA secured frame round-trip using separate TX/RX cont
     REQUIRE(cap.data == sdu);
     REQUIRE(cap.ver == UNI_USLP_VERIF_SUCCESS);
 }
+
+TEST_CASE("SDLS anti-replay window accepts late frames of a lagging diversity carrier once", "[sdls][aead][anti-replay]")
+{
+    static const uint8_t aead_key_128[] = {0x0F, 0x1E, 0x2D, 0x3C, 0x4B, 0x5A, 0x69, 0x78, 0x87, 0x96, 0xA5, 0xB4, 0xC3, 0xD2, 0xE1, 0xF0};
+    // Several carriers of a diversity link deliver copies of the same secured frames; merged into
+    // one receiver, a carrier that lags far behind still contributes frames the leading carrier
+    // lost, as long as the window covers the lag. Duplicates are rejected either way.
+    uni_uslp_managed_params_t p{};
+    configure_common_varlen_no_fecf(p);
+    const uint8_t VC = 3;
+    const uint8_t MAP = 1;
+    const uint16_t SCID = 0x6161;
+
+    const auto make_sdls = [](const uint16_t window) {
+        uni_uslp_sdls_config_t sdls{};
+        sdls.enabled = true;
+        sdls.spi = 3;
+        sdls.iv_length = 12;
+        sdls.mac_length = 16;
+        sdls.encryption_enabled = true;
+        sdls.suite = UNI_USLP_SDLS_SUITE_AES_GCM;
+        sdls.key = aead_key_128;
+        sdls.key_length = sizeof(aead_key_128);
+        sdls.anti_replay_enabled = true;
+        sdls.anti_replay_window = window;
+        sdls.sec_header_present = true;
+        sdls.sec_trailer_present = true;
+        sdls.sec_header_length = 9;
+        sdls.sec_trailer_length = 16;
+        return sdls;
+    };
+
+    uni_uslp_context_t tx{};
+    REQUIRE(uni_ccsds_uslp_init(&tx, SCID, &p) == UNI_USLP_SUCCESS);
+    REQUIRE(uni_ccsds_uslp_register_builtin_sdls(&tx) == UNI_USLP_SUCCESS);
+    REQUIRE(uni_ccsds_uslp_configure_vc(&tx, VC, &p) == UNI_USLP_SUCCESS);
+    REQUIRE(uni_ccsds_uslp_configure_map(&tx, VC, MAP, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);
+    const auto sdls_tx = make_sdls(64);
+    REQUIRE(uni_ccsds_uslp_configure_sdls(&tx, VC, &sdls_tx) == UNI_USLP_SUCCESS);
+
+    std::vector<std::vector<uint8_t>> frames;
+    for (uint32_t index = 0; index < 1500; ++index) {
+        const std::vector<uint8_t> sdu = {static_cast<uint8_t>(index), static_cast<uint8_t>(index >> 8), 0x5A};
+        REQUIRE(uni_ccsds_uslp_send_mapa(&tx, VC, MAP, sdu.data(), sdu.size()) == UNI_USLP_SUCCESS);
+        std::vector<uint8_t> frame(256);
+        size_t flen = frame.size();
+        REQUIRE(uni_ccsds_uslp_build_frame(&tx, VC, MAP, frame.data(), &flen) == UNI_USLP_SUCCESS);
+        frame.resize(flen);
+        frames.push_back(std::move(frame));
+    }
+
+    for (const uint16_t window : {uint16_t{64}, uint16_t{1024}}) {
+        uni_uslp_context_t rx{};
+        REQUIRE(uni_ccsds_uslp_init(&rx, SCID, &p) == UNI_USLP_SUCCESS);
+        REQUIRE(uni_ccsds_uslp_register_builtin_sdls(&rx) == UNI_USLP_SUCCESS);
+        std::vector<uint8_t> rx_work(4096);
+        REQUIRE(uni_ccsds_uslp_set_work_buffer(&rx, rx_work.data(), rx_work.size()) == UNI_USLP_SUCCESS);
+        REQUIRE(uni_ccsds_uslp_configure_vc(&rx, VC, &p) == UNI_USLP_SUCCESS);
+        REQUIRE(uni_ccsds_uslp_configure_map(&rx, VC, MAP, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);
+        const auto sdls_rx = make_sdls(window);
+        REQUIRE(uni_ccsds_uslp_configure_sdls(&rx, VC, &sdls_rx) == UNI_USLP_SUCCESS);
+        CapVer cap{};
+        REQUIRE(uni_ccsds_uslp_register_sdu_callback(&rx, VC, MAP, sdu_capture_cb, &cap) == UNI_USLP_SUCCESS);
+
+        const auto accept = [&](const std::size_t index) { return uni_ccsds_uslp_accept_frame(&rx, frames[index].data(), frames[index].size()); };
+        REQUIRE(accept(1499) == UNI_USLP_SUCCESS);
+        // 900 frames behind the newest one: inside a 1024 window, too old for 64.
+        CHECK(accept(599) == (window > 900 ? UNI_USLP_SUCCESS : UNI_USLP_ERROR_SDLS_FAILURE));
+        CHECK(accept(599) == UNI_USLP_ERROR_SDLS_FAILURE);
+        CHECK(accept(1499) == UNI_USLP_ERROR_SDLS_FAILURE);
+        // Beyond any window.
+        CHECK(accept(99) == UNI_USLP_ERROR_SDLS_FAILURE);
+        // Newer frames keep being accepted; the window slides with them.
+        CHECK(accept(1498) == UNI_USLP_SUCCESS);
+    }
+}

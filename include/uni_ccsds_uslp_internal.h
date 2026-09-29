@@ -182,8 +182,10 @@ typedef struct {
     /* SDLS runtime (per VC) */
     struct {
         uint64_t tx_sn;                 /**< Transmit Sequence Number (monotonic, 64-bit) */
-        uint64_t rx_highest_sn;         /**< Highest SN accepted so far (initially UINT64_MAX to mark unsynced -> set to 0xFFFFFFFFFFFFFFFF? Use 0 to start.) */
-        uint64_t rx_window_bitmap;      /**< Sliding window bitmap (LSB = rx_highest_sn, next bit = -1, etc.), window size up to 64 */
+        uint64_t rx_highest_sn;         /**< Highest SN accepted so far (valid once rx_initialized) */
+        /** Ring bitmap of accepted SNs: bit (sn % UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW) is set when sn was accepted.
+            Only SNs within the configured window below rx_highest_sn are meaningful. */
+        uint64_t rx_window_bitmap[UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW / 64u];
         bool     rx_initialized;        /**< Anti-replay state initialized flag */
     } sdls_rt;
 
