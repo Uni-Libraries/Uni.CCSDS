@@ -63,7 +63,7 @@ static void configure_common_varlen(uni_uslp_managed_params_t& p)
 
 } // namespace
 
-TEST_CASE("Master Channel Generation: build_next_frame composes MC→VC→MAP and sets SCID (USLP-100)", "[uslp][mc][gen][USLP-100]")
+TEST_CASE("Master Channel Generation: build_next_frame composes MC->VC->MAP and sets SCID (USLP-100)", "[uslp][mc][gen][USLP-100]")
 {
     uni_uslp_managed_params_t params{};
     configure_common_varlen(params);

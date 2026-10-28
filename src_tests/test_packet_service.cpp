@@ -350,7 +350,7 @@ static void configure_common_varlen_no_fecf_base(uni_uslp_managed_params_t& p)
 }
 
 /* USLP-148 (Valid PVNs) + USLP-149 (Maximum Packet Length) for MAPP */
-TEST_CASE("MAPP: Packet Transfer parameters — Valid PVNs mask and Maximum Packet Length", "[mapp][packet][table5-5][USLP-148][USLP-149]")
+TEST_CASE("MAPP: Packet Transfer parameters - Valid PVNs mask and Maximum Packet Length", "[mapp][packet][table5-5][USLP-148][USLP-149]")
 {
     uni_uslp_managed_params_t p_vc{};
     configure_common_varlen_no_fecf_base(p_vc);

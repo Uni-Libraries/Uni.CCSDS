@@ -241,7 +241,7 @@ TEST_CASE("Octet Stream sequence-controlled: variable-length, bypass=0 uses VCF-
     REQUIRE(cap.gap == false);
 }
 
-TEST_CASE("Octet Stream rejected on fixed-length frames per §2.2.4.6/§2.2.5(g)", "[uslp][octet_stream][restriction]")
+TEST_CASE("Octet Stream rejected on fixed-length frames per sec.2.2.4.6/sec.2.2.5(g)", "[uslp][octet_stream][restriction]")
 {
     uni_uslp_managed_params_t p{};
     p.max_frame_length = 256;

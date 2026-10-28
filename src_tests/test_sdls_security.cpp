@@ -273,7 +273,7 @@ TEST_CASE("CCSDS-4: an SA restricted to MAP IDs rejects frames of other MAPs", "
     CHECK(link.rx.accept(frame) == UNI_USLP_SUCCESS);
 }
 
-TEST_CASE("CCSDS-5: STRICT anti-replay follows 355.0-B-2 §4.2.4.4 g-j", "[sdls][security][anti-replay]")
+TEST_CASE("CCSDS-5: STRICT anti-replay follows 355.0-B-2 sec.4.2.4.4 g-j", "[sdls][security][anti-replay]")
 {
     auto sa = gcm_sa(kSpi);
     sa.replay_mode = UNI_USLP_SDLS_REPLAY_STRICT;

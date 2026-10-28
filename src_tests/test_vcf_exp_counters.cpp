@@ -235,7 +235,7 @@ TEST_CASE("VCF-EXP: RX continuity when Expedited VCF Count is present", "[uslp][
     REQUIRE(cap.gaps[3] == false);
 }
 
-TEST_CASE("MAPA QoS: PH.Bypass=0 (No QoS on MAPA.request per §3.5.2.5; USLP-27 Support=N)", "[uslp][mapa][qos]")
+TEST_CASE("MAPA QoS: PH.Bypass=0 (No QoS on MAPA.request per sec.3.5.2.5; USLP-27 Support=N)", "[uslp][mapa][qos]")
 {
     uni_uslp_managed_params_t p{};
     configure_common_varlen_no_fecf(p);

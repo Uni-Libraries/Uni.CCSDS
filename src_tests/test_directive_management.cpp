@@ -172,7 +172,7 @@ TEST_CASE("Directive.request COP-1 delivers Directive_Notify QUEUED then SENT", 
     }
 }
 
-TEST_CASE("Directive.request COP-1 is UNSUPPORTED when VCF.request exists on same VC (§2.2.5 b,d)", "[uslp][directive][cop1][coexist]")
+TEST_CASE("Directive.request COP-1 is UNSUPPORTED when VCF.request exists on same VC (sec.2.2.5 b,d)", "[uslp][directive][cop1][coexist]")
 {
     uni_uslp_managed_params_t p{};
     p.max_frame_length = 512;

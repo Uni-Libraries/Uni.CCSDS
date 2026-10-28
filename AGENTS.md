@@ -4,6 +4,7 @@
 * General
     * Write code in C23
     * Write tests in C++23 using Catch2 framework
+    * Keep TEST_CASE names ASCII-only: ctest passes them through the Windows code page, so non-ASCII names match no test
 
 * Documentation
     * before implementation read the following
