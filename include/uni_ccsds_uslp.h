@@ -7,9 +7,6 @@
 extern "C" {
 #endif
 
-/** Largest supported SDLS anti-replay window, in frames. */
-#define UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW 4096u
-
 
     
 //
@@ -22,6 +19,23 @@ extern "C" {
 #include <stdbool.h>
 
 #include "uni_ccsds_export.h"
+
+
+
+//
+// Version
+//
+
+/**
+ * @name Library version
+ * The major version changes with every incompatible API/ABI change. 2.0.0: SDLS Security Association table with
+ * 16-bit SPI, authenticated Primary Header, frame-level SDLS callbacks and per-reason SDLS status codes.
+ * @{
+ */
+#define UNI_CCSDS_VERSION_MAJOR 2
+#define UNI_CCSDS_VERSION_MINOR 0
+#define UNI_CCSDS_VERSION_PATCH 0
+/** @} */
 
 
 
@@ -147,8 +161,10 @@ extern "C" {
 
 /**
  * @brief Maximum SDU size for reassembly
+ *
+ * Bounded by the 16-bit `max_sdu_length` managed parameter (and by the 16-bit Frame Length field).
  */
-#define UNI_USLP_MAX_SDU_SIZE 65536
+#define UNI_USLP_MAX_SDU_SIZE 65535
 
 /**
  * @brief Maximum number of pending SDUs for reassembly
@@ -164,6 +180,32 @@ extern "C" {
  * @brief Maximum Insert Zone size
  */
 #define UNI_USLP_MAX_INSERT_ZONE_SIZE 1024
+
+/**
+ * @name SDLS limits (CCSDS 355.0-B-2)
+ * @{
+ */
+/** Largest supported anti-replay window, in frames. */
+#define UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW 4096u
+/** Security Associations held by one context. */
+#define UNI_USLP_SDLS_MAX_SA 16u
+/** SPIs one Virtual Channel may accept on receive (SA verification, §4.2.4.3 a). */
+#define UNI_USLP_SDLS_MAX_SPI_PER_VC 8u
+/** Security Parameter Index field length in octets (§4.1.1.2.1). */
+#define UNI_USLP_SDLS_SPI_LENGTH 2u
+/** Transmitted Initialization Vector length supported for AEAD suites (96-bit IV, Annex E). */
+#define UNI_USLP_SDLS_IV_LENGTH 12u
+/** Largest Sequence Number field in octets. */
+#define UNI_USLP_SDLS_MAX_SN_LENGTH 8u
+/** Largest MAC (Security Trailer) length in octets (untruncated HMAC-SHA-256). */
+#define UNI_USLP_SDLS_MAX_MAC_LENGTH 32u
+/** Largest Security Header length in octets (§4.1.1.1.4). */
+#define UNI_USLP_SDLS_MAX_HEADER_LENGTH 64u
+/** Length of the configurable part of the authentication bit mask: the longest USLP Primary Header
+ *  (7 octets plus a 7-octet VCF Count). The masks of the Insert Zone, Security Header and Frame Data
+ *  Field are fixed by §4.2.2.6.2 g, h, i. */
+#define UNI_USLP_SDLS_AUTH_MASK_LENGTH 14u
+/** @} */
 
 
 
@@ -189,7 +231,14 @@ typedef enum {
     UNI_USLP_ERROR_NOT_FOUND,       /**< Resource not found */
     UNI_USLP_ERROR_SDLS_FAILURE,    /**< SDLS operation failed */
     UNI_USLP_ERROR_TRUNCATED,       /**< Frame truncated */
-    UNI_USLP_ERROR_SEQUENCE_GAP     /**< Sequence number gap detected */
+    UNI_USLP_ERROR_SEQUENCE_GAP,    /**< Sequence number gap detected */
+    UNI_USLP_ERROR_SDLS_SA_NOT_FOUND,   /**< SDLS: SPI unknown or SA not associated with the frame's VC/MAP (355.0-B-2 §4.2.4.3) */
+    UNI_USLP_ERROR_SDLS_MAC_FAILURE,    /**< SDLS: MAC / AEAD tag verification failed (§4.2.4.4 d, e) */
+    UNI_USLP_ERROR_SDLS_REPLAY,         /**< SDLS: sequence number already accepted or not above the managed one (§4.2.4.4 h) */
+    UNI_USLP_ERROR_SDLS_OUT_OF_WINDOW,  /**< SDLS: sequence number outside the anti-replay window (§4.2.4.4 i) */
+    UNI_USLP_ERROR_SDLS_LENGTH,         /**< SDLS: frame too short for the SA's Security Header and Trailer */
+    UNI_USLP_ERROR_SDLS_SN_NOT_RESTORED,/**< SDLS: transmit SN must be restored (uni_ccsds_uslp_sdls_set_tx_sn) or the SA rekeyed */
+    UNI_USLP_ERROR_SDLS_SN_EXHAUSTED    /**< SDLS: transmit SN space exhausted; continuing would reuse an IV, rekey the SA */
 } uni_uslp_status_t;
 
 
@@ -464,35 +513,123 @@ typedef struct {
 
 
 /**
- * @brief SDLS Configuration (CCSDS 355.0-B-2 §6.6; USLP §6.6.2)
+ * @brief Anti-replay policy of a Security Association.
+ */
+typedef enum {
+    /** CCSDS 355.0-B-2 §4.2.4.4 g–j: reject SN <= managed SN and SN > managed SN + window; the managed SN
+     *  becomes the received one after successful verification. Frames must arrive in SN order. */
+    UNI_USLP_SDLS_REPLAY_STRICT = 0,
+    /** Deviation from 355.0-B-2 (IPsec-style, RFC 4303 §3.4.3): every SN is accepted once if it lags the highest
+     *  accepted SN by less than the window; SNs above it are accepted without a forward bound. Meant for
+     *  diversity reception where copies of a frame stream arrive out of order from several carriers or stations. */
+    UNI_USLP_SDLS_REPLAY_SLIDING = 1
+} uni_uslp_sdls_replay_mode_t;
+
+/**
+ * @brief Wire format of a Security Association.
+ */
+typedef enum {
+    /** CCSDS 355.0-B-2: 16-bit SPI; Primary Header (masked), Insert Zone (zeroed) and Security Header are authenticated. */
+    UNI_USLP_SDLS_FORMAT_355 = 0,
+    /** Uni.CCSDS 1.x wire format, for spacecraft already flying it: Security Header = SPI (1 octet) || SN (8 octets),
+     *  AEAD IV = 0x00000000 || SN, AAD empty, HMAC over the TFDF only. Deviation from 355.0-B-2 §4.1.1.2.1 and
+     *  §4.2.2.6.2: Primary and Security Headers are NOT authenticated (a rewritten VCID/MAP ID goes undetected). Requires
+     *  iv_length = 0, sn_length = 8, spi <= 255. Do not use for new missions. */
+    UNI_USLP_SDLS_FORMAT_UNI_V1 = 1
+} uni_uslp_sdls_format_t;
+
+/**
+ * @brief Security Association (CCSDS 355.0-B-2 §3.4, §4.2.2).
  *
- * Note: Key pointers must remain valid for the lifetime of the context or until reconfigured.
+ * The Security Header is SPI (2 octets) || IV (iv_length) || SN (sn_length); there is no Pad Length field
+ * (none of the suites pads). The Security Trailer is the MAC (mac_length octets).
+ *
+ * Initialization Vector and Sequence Number profiles:
+ *  - iv_length = 12, sn_length = 0: Annex E baseline for AES-GCM — the 96-bit IV is transmitted and is a counter whose
+ *    low 64 bits are the anti-replay sequence number (§4.1.1.4.2 note).
+ *  - iv_length = 0, sn_length = 1..8 (AEAD): the IV is not transmitted; both ends derive the 96-bit IV as
+ *    zero octets || transmitted SN field, big-endian. The SN field width limits the frames per key
+ *    (UNI_USLP_ERROR_SDLS_SN_EXHAUSTED).
+ *  - iv_length = 12, sn_length > 0: IV and SN both transmitted, both equal to the frame counter.
+ *  - HMAC-SHA-256: iv_length = 0, sn_length = 1..8.
+ *
+ * The first frame of an SA carries SN 1 (§4.2.3.4 a: the managed SN is incremented before use).
  */
 typedef struct {
-    bool     enabled;                   /**< SDLS enabled (USLP-151) */
-    uint8_t  spi;                       /**< Security Parameter Index (SDLS §3.4) */
-    uint8_t  iv_length;                 /**< IV/Nonce length (bytes), per suite */
-    uint8_t  mac_length;                /**< ICV/MAC length (bytes), per suite */
-    bool     authentication_only;       /**< Auth-only mode (e.g., HMAC) */
-    bool     encryption_enabled;        /**< Authenticated encryption enabled (AEAD) */
+    uint16_t spi;                       /**< Security Parameter Index, 1..65534 (0 and 65535 are reserved, §4.1.1.2.3) */
+    uni_uslp_sdls_format_t format;      /**< Wire format (default UNI_USLP_SDLS_FORMAT_355) */
+    uni_uslp_sdls_suite_t suite;        /**< Cryptographic function and algorithm (§4.2.2.4) */
+    uint8_t  iv_length;                 /**< Transmitted IV length: 0 or UNI_USLP_SDLS_IV_LENGTH (AEAD only) */
+    uint8_t  sn_length;                 /**< Sequence Number field length, 0..UNI_USLP_SDLS_MAX_SN_LENGTH */
+    uint8_t  mac_length;                /**< Security Trailer length: 16 for AES-GCM, 4..16 even for AES-CCM, 8..32 for HMAC-SHA-256
+                                             (truncated, §4.2.3.4 f), 0..32 for the clear-mode NULL suite */
+    uint16_t map_ids;                   /**< MAP IDs (bit m = MAP m) the SA may protect (GMAP_ID association, §4.2.2.2.1); 0 = all MAPs */
 
-    /* Algorithm suite and keying (maps to CCSDS 355.0-B-2 algorithm profiles) */
-    uni_uslp_sdls_suite_t suite;        /**< Selected transform suite */
-    const uint8_t* key;                 /**< Pointer to key material (AES or HMAC key) */
-    uint16_t key_length;                /**< Key length in bytes */
+    bool     anti_replay_enabled;       /**< Check the sequence number (§4.2.4.4 f–j); requires an SN source (sn_length or iv_length > 0) */
+    uni_uslp_sdls_replay_mode_t replay_mode; /**< Anti-replay policy */
+    uint16_t anti_replay_window;        /**< Window in frames (0 = 64, at most UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW) */
 
-    /* Anti-replay configuration */
-    bool     anti_replay_enabled;       /**< Enable sliding window anti-replay */
-    uint16_t anti_replay_window;        /**< Frames an out-of-order SN may lag the highest one and still be accepted once
-                                             (0 = 64, capped at UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW). Diversity receivers
-                                             that merge several carriers need a window covering the carriers' relative lag. */
+    /** Authentication bit mask over the Transfer Frame Primary Header (§4.2.2.6.2), MSB first, applied to as many octets
+     *  as the frame's Primary Header has. The VCID and MAP ID bits must be set (§4.2.2.6.2 b, c);
+     *  uni_ccsds_uslp_sdls_default_auth_mask() gives the default (VCID and MAP ID only). An all-zero mask in a
+     *  configuration is replaced by the default. Insert Zone (zeros), Security Header (ones except the IV) and Frame
+     *  Data Field (ones) masks are fixed by §4.2.2.6.2 g, h, i. */
+    uint8_t  auth_mask[UNI_USLP_SDLS_AUTH_MASK_LENGTH];
 
-    /* USLP Additional Managed Parameters with SDLS Option (§6.6.2; USLP-176..179) */
-    bool     sec_header_present;        /**< Presence of Security Header (USLP-176) */
-    bool     sec_trailer_present;       /**< Presence of Security Trailer (USLP-177) */
-    uint8_t  sec_header_length;         /**< Security Header length in octets (USLP-178) */
-    uint8_t  sec_trailer_length;        /**< Security Trailer length in octets (USLP-179) */
-} uni_uslp_sdls_config_t;
+    /** Transmit side: refuse ApplySecurity (UNI_USLP_ERROR_SDLS_SN_NOT_RESTORED) after the SA is added and after every
+     *  uni_ccsds_uslp_reset() until the last transmitted SN is restored with uni_ccsds_uslp_sdls_set_tx_sn() or the SA is
+     *  rekeyed. Prevents IV / SN reuse when a transmitter restarts with the same key. */
+    bool     require_sn_restore;
+} uni_uslp_sdls_sa_config_t;
+
+/**
+ * @brief SDLS configuration of one Virtual Channel (USLP §6.6.2, USLP-151).
+ *
+ * Security Associations are added to the context first (uni_ccsds_uslp_sdls_add_sa()); the VC then names the SA it
+ * applies on transmit and the SAs it accepts on receive. On receive the SA is selected by the SPI in the Security
+ * Header, never by the (not yet authenticated) MAP ID. All SAs of one VC must share the wire format, which fixes the
+ * SPI field length.
+ */
+typedef struct {
+    bool     enabled;                   /**< SDLS in effect on this VC */
+    uint16_t tx_spi;                    /**< SA applied by ApplySecurity on this VC (§4.2.3.2.1); 0 = receive-only */
+    uint8_t  rx_spi_count;              /**< Number of valid entries in rx_spis */
+    uint16_t rx_spis[UNI_USLP_SDLS_MAX_SPI_PER_VC]; /**< SAs accepted by ProcessSecurity on this VC (§4.2.4.3 a) */
+} uni_uslp_sdls_vc_config_t;
+
+/**
+ * @brief SDLS receive statistics of one Virtual Channel (frames rejected by ProcessSecurity, by reason).
+ */
+typedef struct {
+    uint64_t frames_verified;           /**< Frames that passed ProcessSecurity */
+    uint64_t sa_not_found;              /**< UNI_USLP_ERROR_SDLS_SA_NOT_FOUND */
+    uint64_t mac_failures;              /**< UNI_USLP_ERROR_SDLS_MAC_FAILURE */
+    uint64_t replays;                   /**< UNI_USLP_ERROR_SDLS_REPLAY */
+    uint64_t out_of_window;             /**< UNI_USLP_ERROR_SDLS_OUT_OF_WINDOW */
+    uint64_t length_errors;             /**< UNI_USLP_ERROR_SDLS_LENGTH */
+    uint64_t other_errors;              /**< Any other ProcessSecurity failure */
+} uni_uslp_sdls_stats_t;
+
+/**
+ * @brief Layout of the Transfer Frame passed to the SDLS callbacks.
+ *
+ * The Security Header starts at offset primary_header_length + insert_zone_length from the first octet of the frame.
+ */
+typedef struct {
+    uint8_t vcid;                       /**< Virtual Channel ID of the frame */
+    uint8_t map_id;                     /**< MAP ID of the frame */
+    size_t  primary_header_length;      /**< Primary Header length including the VCF Count field */
+    size_t  insert_zone_length;         /**< Insert Zone length (0 when absent) */
+} uni_uslp_sdls_frame_layout_t;
+
+/**
+ * @brief Result details of ProcessSecurity.
+ */
+typedef struct {
+    uint16_t spi;                       /**< SPI read from the Security Header (0 when the header could not be read) */
+    uint64_t sequence_number;           /**< Anti-replay SN of the frame (0 when the SA has none) */
+    uni_uslp_verification_status_t verification; /**< Verification status for the service indications */
+} uni_uslp_sdls_rx_info_t;
 
 
 
@@ -871,51 +1008,58 @@ typedef void (*uni_uslp_async_notify_cb_t)(
     void *user_data
 );
 /**
- * @brief SDLS Apply Security callback (CCSDS 355.0-B-2 §3.3)
- * 
- * @param context USLP context
- * @param input_frame Input frame buffer
- * @param input_length Input frame length
- * @param output_frame Output frame buffer
- * @param output_length Output frame length (in/out)
- * @param config SDLS configuration
- * @param user_data User-provided data
- * @return Status code
+ * @brief SDLS ApplySecurity callback (CCSDS 355.0-B-2 §3.2, §4.2.3).
+ *
+ * Called while a frame is built, after the Primary Header and Insert Zone are written. The plaintext Transfer Frame
+ * Data Field (TFDF header + TFDZ) is already in place after the space reserved for the Security Header. The callback
+ * writes the Security Header, protects the TFDF in place and writes the Security Trailer right after it. Header and
+ * trailer lengths are those of the SA `spi`; the core has checked that the frame buffer holds them.
+ *
+ * @param context     USLP context
+ * @param layout      Frame layout (VCID, MAP ID, Primary Header and Insert Zone lengths)
+ * @param spi         SA configured for the VC (uni_uslp_sdls_vc_config_t::tx_spi)
+ * @param frame       Frame buffer starting at the first Primary Header octet
+ * @param tfdf_length Plaintext TFDF length
+ * @param user_data   User data from uni_ccsds_uslp_register_sdls_callbacks()
+ * @return UNI_USLP_SUCCESS, or an error that aborts the frame build
  */
 typedef uni_uslp_status_t (*uni_uslp_sdls_apply_callback_t)(
     uni_uslp_context_t *context,
-    uint8_t vcid,                       /* VC context for per-SA state */
-    const uint8_t *input_frame,         /* TFDF header + TFDZ (no OCF/FECF) */
-    size_t input_length,
-    uint8_t *output_frame,              /* Security Header + protected TFDF’ + Security Trailer */
-    size_t *output_length,
-    const uni_uslp_sdls_config_t *config,
+    const uni_uslp_sdls_frame_layout_t *layout,
+    uint16_t spi,
+    uint8_t *frame,
+    size_t tfdf_length,
     void *user_data
 );
 
 
 /**
- * @brief SDLS Process Security callback (CCSDS 355.0-B-2 §3.4)
- * 
- * @param context USLP context
- * @param input_frame Input frame buffer
- * @param input_length Input frame length
- * @param output_frame Output frame buffer
- * @param output_length Output frame length (in/out)
- * @param config SDLS configuration
- * @param user_data User-provided data
- * @return Status code
+ * @brief SDLS ProcessSecurity callback (CCSDS 355.0-B-2 §3.3, §4.2.4).
+ *
+ * Called for every received frame of an SDLS-enabled VC before the TFDF is parsed. The whole frame is passed so the
+ * Primary Header can be authenticated (§4.2.2.6.2). The callback selects the SA by the SPI in the Security Header,
+ * verifies it (§4.2.4.3), checks anti-replay, authenticates / decrypts and writes the plaintext TFDF to tfdf_out.
+ *
+ * @param context          USLP context
+ * @param layout           Frame layout (VCID, MAP ID, Primary Header and Insert Zone lengths)
+ * @param frame            Received frame from the first Primary Header octet
+ * @param protected_length Octets from the start of the Security Header to the end of the Security Trailer
+ *                         (OCF and FECF excluded)
+ * @param tfdf_out         Output buffer for the plaintext TFDF
+ * @param tfdf_length      In: capacity of tfdf_out; out: TFDF length
+ * @param info             Out: SPI, SN and verification status (filled as far as the frame was processed)
+ * @param user_data        User data from uni_ccsds_uslp_register_sdls_callbacks()
+ * @return UNI_USLP_SUCCESS or the reason of the rejection (UNI_USLP_ERROR_SDLS_*)
  */
 typedef uni_uslp_status_t (*uni_uslp_sdls_process_callback_t)(
     uni_uslp_context_t *context,
-    uint8_t vcid,                       /* VC context for per-SA state */
-    const uint8_t *input_frame,         /* Security Header + protected TFDF’ + Security Trailer */
-    size_t input_length,
-    uint8_t *output_frame,              /* TFDF header + TFDZ (no SDLS data) */
-    size_t *output_length,
-    const uni_uslp_sdls_config_t *config,
-    void *user_data,
-    uint64_t *out_seq_num               /* Parsed Sequence Number (for anti-replay) */
+    const uni_uslp_sdls_frame_layout_t *layout,
+    const uint8_t *frame,
+    size_t protected_length,
+    uint8_t *tfdf_out,
+    size_t *tfdf_length,
+    uni_uslp_sdls_rx_info_t *info,
+    void *user_data
 );
 
 /* TX callbacks for VCF/MCF request provider bridging (USLP §3.9.3.2, §3.10.3.2)
@@ -968,6 +1112,10 @@ UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_reset(uni_uslp_context_t *cont
 
 /**
  * @brief Free USLP context resources
+ *
+ * Must be called for every initialized context that had SDLS Security Associations: SAs hold crypto backend state
+ * (allocated by the backend when the SA is keyed) and key schedules, which are released and zeroized here. The
+ * context memory itself is caller-owned and is zero-filled.
  *
  * @param context Context to free
  * @return Status code
@@ -1047,17 +1195,31 @@ UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_set_mux_policy(
 );
 
 /**
- * @brief Configure SDLS
+ * @brief Configure SDLS on a Virtual Channel
+ *
+ * The configuration is validated here, not on the first frame: every SPI it names must belong to an SA added with
+ * uni_ccsds_uslp_sdls_add_sa(), and rx_spi_count must not exceed UNI_USLP_SDLS_MAX_SPI_PER_VC. A disabled
+ * configuration is always accepted.
  *
  * @param context USLP context
  * @param vcid Virtual Channel ID
- * @param config SDLS configuration
- * @return Status code
+ * @param config SDLS configuration of the VC
+ * @return UNI_USLP_SUCCESS, UNI_USLP_ERROR_INVALID_PARAM (also for SAs of different wire formats), or
+ *         UNI_USLP_ERROR_SDLS_SA_NOT_FOUND
  */
 UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_configure_sdls(
     uni_uslp_context_t *context,
     uint8_t vcid,
-    const uni_uslp_sdls_config_t *config
+    const uni_uslp_sdls_vc_config_t *config
+);
+
+/**
+ * @brief Read the SDLS receive statistics of a Virtual Channel (reset by uni_ccsds_uslp_reset()).
+ */
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_get_sdls_stats(
+    const uni_uslp_context_t *context,
+    uint8_t vcid,
+    uni_uslp_sdls_stats_t *out_stats
 );
 
 /* ========================================================================== */
@@ -2044,49 +2206,126 @@ UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_build_next_frame(
 );
 
 
+/* ========================================================================== */
+/* SDLS SECURITY ASSOCIATIONS AND BUILT-IN ENGINE (CCSDS 355.0-B-2)           */
+/* ========================================================================== */
+
 /*
- * Built-in SDLS engine for USLP (CCSDS-355.0-B-2; USLP §6)
+ * The context holds a table of up to UNI_USLP_SDLS_MAX_SA Security Associations, selected by SPI. Each SA keeps its
+ * keyed crypto context (key schedule computed once at add/rekey; the key bytes are not retained), its transmit SN
+ * and its receive anti-replay state. Virtual Channels refer to SAs by SPI (uni_ccsds_uslp_configure_sdls()).
  *
- * Header/Trailer per project defaults (confirmed by integrator):
- *  - NULL: no Security Header/Trailer
- *  - HMAC-SHA256 (auth-only): Security Header = SPI(1) || SN(8) (big-endian),
- *                             Security Trailer = ICV (16 bytes, truncated SHA-256)
- *  - AES-GCM/CCM (AEAD):      Security Header = SPI(1) || SN(8) (big-endian),
- *                             IV = 12 bytes derived from SN as 0x00000000 || SN_be_8,
- *                             Security Trailer = AEAD Tag (16 bytes)
- *  - Integrity covers TFDF only (header+TFDZ). Insert/OCF/FECF excluded (USLP §6.3; SDLS §2.3.2.2).
- *  - Anti-replay window: sliding window (configurable, default 64) based on SN in Security Header.
+ * Suites of the built-in engine:
+ *  - AES-GCM / AES-CCM (authenticated encryption): plaintext = TFDF, AAD = masked Primary Header || zeroed Insert Zone ||
+ *    Security Header with the IV field zeroed (§4.2.3.2.2.3 a, §4.2.2.6.2); IV per uni_uslp_sdls_sa_config_t.
+ *  - HMAC-SHA-256 (authentication): MAC over the same Authentication Payload followed by the TFDF, truncated.
+ *  - NULL ("clear mode", §4.2.2.4 note): header and trailer with the SA's lengths, no cryptography, no anti-replay;
+ *    indications report UNI_USLP_VERIF_NOT_APPLICABLE. Not for operational use.
  *
- * API:
- *  - Register built-in engine on a context via uni_ccsds_uslp_register_builtin_sdls().
- *  - The engine implements the sdls_apply/process callbacks wired by the core.
+ * Receive order: SA verification by SPI, anti-replay check without state change, MAC / decryption, then the anti-replay
+ * state is updated — only for frames that passed every check (§4.2.4.4 j). The SN check runs before the MAC so
+ * duplicates are rejected cheaply (as in RFC 4303 §3.4.3); it does not change state, so a forged frame cannot move
+ * the window.
+ *
+ * Deviations from 355.0-B-2 are listed in docs/uslp_sdls_deviations.md.
  */
 
-/* Register the built-in SDLS engine callbacks on the context */
+/** Fill `mask` with the default authentication bit mask of §4.2.2.6.2: VCID and MAP ID bits set, other Primary Header
+ *  bits clear. */
+UNI_CCSDS_EXPORT void uni_ccsds_uslp_sdls_default_auth_mask(uint8_t mask[UNI_USLP_SDLS_AUTH_MASK_LENGTH]);
+
+/**
+ * @brief Validate an SA configuration and key and add the SA to the context.
+ *
+ * @param context    USLP context
+ * @param config     SA configuration (copied)
+ * @param key        Key material: 16, 24 or 32 octets for AES, 16..64 octets for HMAC-SHA-256, unused for NULL
+ * @param key_length Key length in octets
+ * @return UNI_USLP_SUCCESS; UNI_USLP_ERROR_INVALID_PARAM for an invalid configuration, key length or an SPI already in
+ *         use; UNI_USLP_ERROR_CONTEXT_FULL when UNI_USLP_SDLS_MAX_SA SAs exist; UNI_USLP_ERROR_SDLS_FAILURE when the
+ *         crypto backend rejects the key
+ */
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_add_sa(
+    uni_uslp_context_t *context,
+    const uni_uslp_sdls_sa_config_t *config,
+    const uint8_t *key,
+    size_t key_length
+);
+
+/** Remove an SA and zeroize its key schedule. VCs that still name the SPI reject frames with
+ *  UNI_USLP_ERROR_SDLS_SA_NOT_FOUND. */
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_remove_sa(uni_uslp_context_t *context, uint16_t spi);
+
+/** Replace the key of an SA. A new key starts a new IV/SN space: the transmit SN restarts (next frame SN 1), the
+ *  SN-restore requirement is cleared and the receive anti-replay state is reset. */
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_rekey_sa(
+    uni_uslp_context_t *context,
+    uint16_t spi,
+    const uint8_t *key,
+    size_t key_length
+);
+
+/** Copy the configuration of an SA. */
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_get_sa_config(
+    const uni_uslp_context_t *context,
+    uint16_t spi,
+    uni_uslp_sdls_sa_config_t *out_config
+);
+
+/** Last transmitted SN of an SA (0 before the first frame). Persist it to restore it after a restart. */
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_get_tx_sn(
+    const uni_uslp_context_t *context,
+    uint16_t spi,
+    uint64_t *out_last_sn
+);
+
+/**
+ * @brief Restore the last transmitted SN of an SA; the next frame uses last_sn + 1.
+ *
+ * Clears the SN-restore requirement. While no restore is pending, the SN may only move forward
+ * (UNI_USLP_ERROR_INVALID_PARAM otherwise), because a lower value would reuse IVs.
+ */
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_set_tx_sn(
+    uni_uslp_context_t *context,
+    uint16_t spi,
+    uint64_t last_sn
+);
+
+/**
+ * @brief Set the managed (receive) anti-replay SN of an SA, e.g. from key management (355.1 "Set ARSN").
+ *
+ * Without it, the first frame that passes MAC verification after the SA is added or the context is reset initializes
+ * the receive state.
+ */
+UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_set_rx_sn(
+    uni_uslp_context_t *context,
+    uint16_t spi,
+    uint64_t managed_sn
+);
+
+/** Register the built-in SDLS engine callbacks on the context. */
 UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_register_builtin_sdls(uni_uslp_context_t* context);
 
-/* Exposed for tests and advanced integration: built-in callbacks */
+/** Built-in ApplySecurity (see uni_uslp_sdls_apply_callback_t). Exposed for tests and advanced integration. */
 UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_builtin_apply(
     uni_uslp_context_t *context,
-    uint8_t vcid,
-    const uint8_t *input_frame,
-    size_t input_length,
-    uint8_t *output_frame,
-    size_t *output_length,
-    const uni_uslp_sdls_config_t *config,
+    const uni_uslp_sdls_frame_layout_t *layout,
+    uint16_t spi,
+    uint8_t *frame,
+    size_t tfdf_length,
     void *user_data
 );
 
+/** Built-in ProcessSecurity (see uni_uslp_sdls_process_callback_t). Exposed for tests and advanced integration. */
 UNI_CCSDS_EXPORT uni_uslp_status_t uni_ccsds_uslp_sdls_builtin_process(
     uni_uslp_context_t *context,
-    uint8_t vcid,
-    const uint8_t *input_frame,
-    size_t input_length,
-    uint8_t *output_frame,
-    size_t *output_length,
-    const uni_uslp_sdls_config_t *config,
-    void *user_data,
-    uint64_t *out_seq_num
+    const uni_uslp_sdls_frame_layout_t *layout,
+    const uint8_t *frame,
+    size_t protected_length,
+    uint8_t *tfdf_out,
+    size_t *tfdf_length,
+    uni_uslp_sdls_rx_info_t *info,
+    void *user_data
 );
 
 #ifdef __cplusplus

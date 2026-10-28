@@ -28,6 +28,13 @@ const char* uni_ccsds_uslp_status_string(uni_uslp_status_t status)
         case UNI_USLP_ERROR_SDLS_FAILURE:    return "UNI_USLP_ERROR_SDLS_FAILURE: SDLS operation failed";
         case UNI_USLP_ERROR_TRUNCATED:       return "UNI_USLP_ERROR_TRUNCATED: Frame truncated";
         case UNI_USLP_ERROR_SEQUENCE_GAP:    return "UNI_USLP_ERROR_SEQUENCE_GAP: Sequence number gap detected";
+        case UNI_USLP_ERROR_SDLS_SA_NOT_FOUND:    return "UNI_USLP_ERROR_SDLS_SA_NOT_FOUND: SDLS SA unknown or not associated with the VC/MAP";
+        case UNI_USLP_ERROR_SDLS_MAC_FAILURE:     return "UNI_USLP_ERROR_SDLS_MAC_FAILURE: SDLS MAC verification failed";
+        case UNI_USLP_ERROR_SDLS_REPLAY:          return "UNI_USLP_ERROR_SDLS_REPLAY: SDLS sequence number replayed";
+        case UNI_USLP_ERROR_SDLS_OUT_OF_WINDOW:   return "UNI_USLP_ERROR_SDLS_OUT_OF_WINDOW: SDLS sequence number outside the anti-replay window";
+        case UNI_USLP_ERROR_SDLS_LENGTH:          return "UNI_USLP_ERROR_SDLS_LENGTH: Frame too short for the SDLS Security Header and Trailer";
+        case UNI_USLP_ERROR_SDLS_SN_NOT_RESTORED: return "UNI_USLP_ERROR_SDLS_SN_NOT_RESTORED: SDLS transmit sequence number not restored";
+        case UNI_USLP_ERROR_SDLS_SN_EXHAUSTED:    return "UNI_USLP_ERROR_SDLS_SN_EXHAUSTED: SDLS transmit sequence number space exhausted";
         default:                             return "UNI_USLP_ERROR_UNKNOWN: Unknown status code";
     }
 }

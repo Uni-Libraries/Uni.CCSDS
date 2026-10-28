@@ -19,6 +19,10 @@ extern "C" {
 // uni.ccsds
 #include "uni_ccsds_uslp.h"
 
+// uni.crypto (keyed contexts held by Security Associations)
+#include <uni_crypto_aead.h>
+#include <uni_crypto_hmac.h>
+
 
 /**
  * @brief Force inline attribute
@@ -176,18 +180,9 @@ typedef struct {
     bool     ocf_pending;               /**< OCF pending flag */
     uni_uslp_ocf_t ocf_value;           /**< OCF value to emit */
     
-    /* SDLS configuration */
-    uni_uslp_sdls_config_t sdls_config; /**< SDLS configuration */
-
-    /* SDLS runtime (per VC) */
-    struct {
-        uint64_t tx_sn;                 /**< Transmit Sequence Number (monotonic, 64-bit) */
-        uint64_t rx_highest_sn;         /**< Highest SN accepted so far (valid once rx_initialized) */
-        /** Ring bitmap of accepted SNs: bit (sn % UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW) is set when sn was accepted.
-            Only SNs within the configured window below rx_highest_sn are meaningful. */
-        uint64_t rx_window_bitmap[UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW / 64u];
-        bool     rx_initialized;        /**< Anti-replay state initialized flag */
-    } sdls_rt;
+    /* SDLS configuration (SAs are referenced by SPI) and receive statistics */
+    uni_uslp_sdls_vc_config_t sdls_config; /**< SDLS configuration */
+    uni_uslp_sdls_stats_t     sdls_stats;  /**< ProcessSecurity outcomes */
 
     /* Statistics */
     uint64_t frames_sent;               /**< Frames sent count */
@@ -211,6 +206,33 @@ typedef struct {
     uint64_t frames_sent;               /**< Frames sent count */
     uint64_t frames_received;           /**< Frames received count */
 } uni_uslp_mc_state_t;
+
+/**
+ * @brief Security Association runtime entry (CCSDS 355.0-B-2 §3.4, §4.2.2)
+ *
+ * Holds the keyed crypto context so the key schedule is computed once per key, and the SN state shared by every VC
+ * that uses the SA.
+ */
+typedef struct {
+    bool     in_use;                    /**< Table slot occupied */
+    uni_uslp_sdls_sa_config_t config;   /**< Validated configuration */
+
+    /* Keyed crypto state (one of them, by suite) */
+    uni_crypto_aead_ctx aead;           /**< AES-GCM / AES-CCM key schedule */
+    uni_crypto_hmac_context* hmac;      /**< HMAC context living in hmac_storage */
+    uint64_t hmac_storage[(UNI_CRYPTO_HMAC_CONTEXT_SIZE + 7u) / 8u];
+
+    /* Transmit */
+    uint64_t tx_sn;                     /**< Last transmitted SN (0 before the first frame) */
+    bool     tx_sn_restore_pending;     /**< ApplySecurity refused until the SN is restored or the SA rekeyed */
+
+    /* Receive anti-replay */
+    bool     rx_initialized;            /**< Managed SN known */
+    uint64_t rx_sn;                     /**< Managed SN (STRICT) / highest accepted SN (SLIDING) */
+    /** SLIDING: ring bitmap of accepted SNs, bit (sn % UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW); only SNs within the
+        window below rx_sn are meaningful. */
+    uint64_t rx_window_bitmap[UNI_USLP_SDLS_MAX_ANTI_REPLAY_WINDOW / 64u];
+} uni_uslp_sdls_sa_t;
 
 /**
  * @brief USLP Context Structure
@@ -238,6 +260,9 @@ struct uni_uslp_context {
     uni_uslp_sdls_apply_callback_t sdls_apply_callback; /**< SDLS apply callback */
     uni_uslp_sdls_process_callback_t sdls_process_callback; /**< SDLS process callback */
     void    *sdls_user_data;            /**< SDLS user data */
+
+    /* SDLS Security Association table, looked up by SPI */
+    uni_uslp_sdls_sa_t sdls_sa[UNI_USLP_SDLS_MAX_SA];
 
     /* MCF Service indication (§3.10.3.3) — Parameters §3.10.2.2..§3.10.2.4 */
     uni_uslp_mcf_indication_cb_t mcf_indication_cb; /**< MCF.indication callback (optional) */
@@ -322,6 +347,32 @@ uni_uslp_vc_state_t* uni_ccsds_uslp_get_vc_state(
     uni_uslp_context_t *context,
     uint8_t vcid
 );
+
+/**
+ * @brief Find an in-use Security Association by SPI
+ *
+ * @return SA or NULL
+ */
+uni_uslp_sdls_sa_t* uni_ccsds_uslp_sdls_find_sa(
+    uni_uslp_context_t *context,
+    uint16_t spi
+);
+
+/**
+ * @brief Security Header and Trailer lengths of an SA configuration
+ */
+size_t uni_ccsds_uslp_sdls_header_length(const uni_uslp_sdls_sa_config_t *config);
+
+/**
+ * @brief Clear the receive anti-replay state of every SA and arm the SN-restore requirement where configured
+ *        (part of uni_ccsds_uslp_reset()).
+ */
+void uni_ccsds_uslp_sdls_reset_sessions(uni_uslp_context_t *context);
+
+/**
+ * @brief Release the crypto state of every SA (part of uni_ccsds_uslp_free()).
+ */
+void uni_ccsds_uslp_sdls_free_all(uni_uslp_context_t *context);
 
 /**
  * @brief Allocate reassembly state

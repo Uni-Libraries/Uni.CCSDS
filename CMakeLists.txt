@@ -6,7 +6,7 @@
 #
 
 cmake_minimum_required(VERSION 3.10)
-project(uni_ccsds)
+project(uni_ccsds VERSION 2.0.0 LANGUAGES C CXX)
 
 #
 # Options
@@ -16,6 +16,26 @@ project(uni_ccsds)
 option(UNI_CCSDS_ENABLE_ASAN "Enable AddressSanitizer" OFF)
 option(UNI_CCSDS_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
 option(UNI_CCSDS_ENABLE_COVERAGE "Enable coverage flags" OFF)
+
+# Instrument everything configured after this point (library, uni.crypto, tests, tools).
+if(UNI_CCSDS_ENABLE_ASAN OR UNI_CCSDS_ENABLE_UBSAN OR UNI_CCSDS_ENABLE_COVERAGE)
+    if(MSVC)
+        message(FATAL_ERROR "UNI_CCSDS_ENABLE_ASAN/UBSAN/COVERAGE are supported with GCC and Clang only")
+    endif()
+    add_compile_options(-fno-omit-frame-pointer)
+endif()
+if(UNI_CCSDS_ENABLE_ASAN)
+    add_compile_options(-fsanitize=address)
+    add_link_options(-fsanitize=address)
+endif()
+if(UNI_CCSDS_ENABLE_UBSAN)
+    add_compile_options(-fsanitize=undefined -fno-sanitize-recover=undefined)
+    add_link_options(-fsanitize=undefined)
+endif()
+if(UNI_CCSDS_ENABLE_COVERAGE)
+    add_compile_options(--coverage -O0 -g)
+    add_link_options(--coverage)
+endif()
 
 
 
@@ -108,4 +128,24 @@ if(PROJECT_IS_TOP_LEVEL)
     add_subdirectory(src_validation)
     enable_testing()
     add_subdirectory(src_tests)
+endif()
+
+
+
+#
+# Documentation
+#
+
+# `cmake --build <dir> --target uni_ccsds_docs` writes HTML to <source>/build/docs/html (path set in Doxyfile, so a
+# plain `doxygen Doxyfile` from the source root gives the same result).
+if(PROJECT_IS_TOP_LEVEL)
+    find_package(Doxygen)
+    if(DOXYGEN_FOUND)
+        add_custom_target(uni_ccsds_docs
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/build/docs"
+            COMMAND Doxygen::doxygen "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMENT "Generating Uni.CCSDS API documentation"
+            VERBATIM)
+    endif()
 endif()

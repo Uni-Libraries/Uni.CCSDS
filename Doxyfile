@@ -2,9 +2,10 @@
 # Reference: CCSDS 732.1-B-3 / 700.1-G-1 / 355.0-B-2 (docs/)
 
 # Project
-PROJECT_NAME           = "uni.CCSDS USLP"
-PROJECT_NUMBER         = "0.1.0"
-OUTPUT_DIRECTORY       = docs
+PROJECT_NAME           = "Uni.CCSDS"
+PROJECT_NUMBER         = "2.0.0"
+OUTPUT_DIRECTORY       = build/docs
+CREATE_SUBDIRS_LEVEL   = 8
 CREATE_SUBDIRS         = NO
 ALLOW_UNICODE_NAMES    = YES
 OUTPUT_LANGUAGE        = English
@@ -17,7 +18,7 @@ TOC_INCLUDE_HEADINGS   = 3
 USE_MDFILE_AS_MAINPAGE = README.md
 
 # Input
-INPUT                  = include src README.md
+INPUT                  = include README.md docs/uslp.md docs/uslp_sdls.md docs/uslp_faq.md docs/uslp_pics.md examples
 FILE_PATTERNS          = *.h *.c *.md
 RECURSIVE              = YES
 EXCLUDE_PATTERNS       = */build/* */.cache/*
@@ -39,8 +40,8 @@ REFERENCES_LINK_SOURCE = YES
 WARNINGS               = YES
 WARN_IF_UNDOCUMENTED   = NO
 WARN_IF_DOC_ERROR      = YES
-WARN_NO_PARAMDOC       = YES
-WARN_AS_ERROR          = NO
+WARN_NO_PARAMDOC       = NO
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
 
 # Extraction
 EXTRACT_ALL            = YES
@@ -79,3 +80,10 @@ SKIP_FUNCTION_MACROS   = YES
 ALIASES               += "USLP_SEC=@par USLP Spec: CCSDS 732.1-B-3"
 ALIASES               += "SDLS_SEC=@par SDLS Spec: CCSDS 355.0-B-2"
 ALIASES               += "OVERVIEW_SEC=@par Overview: CCSDS 700.1-G-1"
+PROJECT_BRIEF          = "CCSDS USLP (732.1-B-3) with SDLS (355.0-B-2)"
+
+EXAMPLE_PATH           = examples
+
+QUIET                  = YES
+
+PREDEFINED             = "UNI_CCSDS_EXPORT=" __cplusplus

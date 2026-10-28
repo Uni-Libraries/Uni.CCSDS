@@ -2,47 +2,50 @@
 
 ## 1. API overview
 - Context lifecycle:
-  - [uni_ccsds_uslp_init()](include/uni_ccsds_uslp.h:911), [uni_ccsds_uslp_reset()](include/uni_ccsds_uslp.h:923), [uni_ccsds_uslp_free()](include/uni_ccsds_uslp.h:931)
-  - Scratch buffer for RX transforms: [uni_ccsds_uslp_set_work_buffer()](include/uni_ccsds_uslp.h:947)
+  - `uni_ccsds_uslp_init()`, `uni_ccsds_uslp_reset()`, `uni_ccsds_uslp_free()`
+  - Scratch buffer for RX transforms: `uni_ccsds_uslp_set_work_buffer()`
 - Configuration:
-  - VC: [uni_ccsds_uslp_configure_vc()](include/uni_ccsds_uslp.h:965), MAP: [uni_ccsds_uslp_configure_map()](include/uni_ccsds_uslp.h:981)
-  - SDLS: [uni_ccsds_uslp_configure_sdls()](include/uni_ccsds_uslp.h:1013), register built‑in engine: [uni_ccsds_uslp_register_builtin_sdls()](include/uni_ccsds_uslp.h:2009)
+  - VC: `uni_ccsds_uslp_configure_vc()`, MAP: `uni_ccsds_uslp_configure_map()`
+  - SDLS: Security Associations `uni_ccsds_uslp_sdls_add_sa()`, per‑VC `uni_ccsds_uslp_configure_sdls()`, built‑in engine `uni_ccsds_uslp_register_builtin_sdls()` — see [uslp_sdls.md](uslp_sdls.md)
 - Queue SDUs:
-  - MAPA: [uni_ccsds_uslp_send_mapa()](include/uni_ccsds_uslp.h:1511), Packet: [uni_ccsds_uslp_send_packet_ex()](include/uni_ccsds_uslp.h:1463), VCP: [uni_ccsds_uslp_send_vcp_ex()](include/uni_ccsds_uslp.h:1491), VCA: [uni_ccsds_uslp_send_vca_ex()](include/uni_ccsds_uslp.h:1536), Octet Stream: [uni_ccsds_uslp_send_octet_stream_ex()](include/uni_ccsds_uslp.h:1563)
+  - MAPA: `uni_ccsds_uslp_send_mapa()`, Packet: `uni_ccsds_uslp_send_packet_ex()`, VCP: `uni_ccsds_uslp_send_vcp_ex()`, VCA: `uni_ccsds_uslp_send_vca_ex()`, Octet Stream: `uni_ccsds_uslp_send_octet_stream_ex()`
 - Build/accept frames:
-  - Build: [uni_ccsds_uslp_build_frame()](include/uni_ccsds_uslp.h:1706), Truncated: [uni_ccsds_uslp_build_truncated()](include/uni_ccsds_uslp.h:1737)
-  - Accept: [uni_ccsds_uslp_accept_frame()](include/uni_ccsds_uslp.h:1756)
+  - Build: `uni_ccsds_uslp_build_frame()`, Truncated: `uni_ccsds_uslp_build_truncated()`
+  - Accept: `uni_ccsds_uslp_accept_frame()`
 - Helpers:
-  - Primary Header pack/unpack: [uni_ccsds_uslp_primary_header_pack()](include/uni_ccsds_uslp.h:1806), [uni_ccsds_uslp_primary_header_unpack()](include/uni_ccsds_uslp.h:1824)
-  - TFDF header helpers: [uni_ccsds_uslp_tfdf_header_pack()](include/uni_ccsds_uslp.h:1840), [uni_ccsds_uslp_tfdf_header_unpack()](include/uni_ccsds_uslp.h:1856)
-  - CRC append/verify: [uni_crypto_crc16_ccitt_append()](3rdparty/uni.crypto/include/uni_crypto_crc16.h:96), [uni_crypto_crc16_ccitt_verify()](3rdparty/uni.crypto/include/uni_crypto_crc16.h:81)
+  - Primary Header pack/unpack: `uni_ccsds_uslp_primary_header_pack()`, `uni_ccsds_uslp_primary_header_unpack()`
+  - TFDF header helpers: `uni_ccsds_uslp_tfdf_header_pack()`, `uni_ccsds_uslp_tfdf_header_unpack()`
+  - CRC append/verify: `uni_crypto_crc16_ccitt_append()`, `uni_crypto_crc16_ccitt_verify()`
 
 ## 2. Memory model and lifetime
-- No dynamic allocation by default; all buffers are supplied by the caller.
+- The library does not allocate; all buffers are supplied by the caller. The crypto backend (Mbed TLS) may allocate
+  when an SDLS Security Association is keyed; call `uni_ccsds_uslp_free()` on every context that had SAs.
 - TX queueing is zero‑copy: send APIs store pointers to your SDU; keep the SDU buffer alive until build returns.
 - Build path writes into a caller‑supplied frame buffer; pass capacity via *frame_length; on success it returns produced bytes.
-- RX path can run fully allocation‑free. If SDLS is enabled, set an RX scratch buffer via [uni_ccsds_uslp_set_work_buffer()](include/uni_ccsds_uslp.h:947) large enough for “TFDF header + TFDZ”.
+- RX path can run fully allocation‑free. If SDLS is enabled, set an RX scratch buffer via `uni_ccsds_uslp_set_work_buffer()` large enough for “TFDF header + TFDZ”.
 - Parser returns pointers into your input buffer (zero‑copy); they become invalid when the input buffer goes out of scope.
-- Maximum frame length on wire: [UNI_USLP_MAX_FRAME_LENGTH](include/uni_ccsds_uslp.h:44) (65535). VCID 0..[UNI_USLP_MAX_VCID](include/uni_ccsds_uslp.h:104) (63), MAP ID 0..[UNI_USLP_MAX_MAP_ID](include/uni_ccsds_uslp.h:109) (15), SCID 0..[UNI_USLP_MAX_SCID](include/uni_ccsds_uslp.h:99).
+- Maximum frame length on wire: `UNI_USLP_MAX_FRAME_LENGTH` (65535). VCID 0..`UNI_USLP_MAX_VCID` (63), MAP ID 0..`UNI_USLP_MAX_MAP_ID` (15), SCID 0..`UNI_USLP_MAX_SCID`.
 - Alignment: byte‑addressable; structures are packed to octet boundaries and serialized MSB‑first.
-- Custom allocator hooks: not required because the library does not allocate. If you write a custom SDLS engine, carry malloc/free‑like hooks in the callback user_data and use them for any temporary buffers.
+- Custom allocator hooks: not required by the library itself. A custom SDLS engine can carry allocator hooks in the callback user_data.
 
 ## 3. Thread‑safety and security
 - One thread per context. A context is not internally synchronized; use external locking if accessed concurrently.
 - Separate contexts are independent.
-- Secrets: built‑in SDLS avoids long‑lived intermediate copies and zeroizes temporary buffers (see [src/uslp_sdls.c](src/uslp_sdls.c:272)).
+- Secrets: SAs keep only the key schedule (the caller's key bytes are not retained); it is zeroized by `uni_ccsds_uslp_sdls_remove_sa()` and `uni_ccsds_uslp_free()`. Temporary AAD/MAC buffers are zeroized (src/uni_ccsds_uslp_sdls.c).
 - Constant‑time: relies on the underlying crypto backend (mbedTLS via uni.crypto). Do not branch on secret‑dependent values in custom callbacks.
-- Key/nonce lifetime: keys live in your configuration struct; zeroize when rotating. Nonces for AEAD are derived from the 64‑bit Sequence Number (SN) per USLP §6 (IV = 0x00000000 || SN_be_8), preventing reuse until wrap.
+- Key/nonce lifetime: AEAD IVs are either transmitted counters or derived from the SN field; the transmitter refuses to wrap (`UNI_USLP_ERROR_SDLS_SN_EXHAUSTED`) and, with `require_sn_restore`, to restart without its persisted SN — see [uslp_sdls.md](uslp_sdls.md).
 
 # 4. Errors and return codes
-All public APIs return a [uni_uslp_status_t](include/uni_ccsds_uslp.h:174) code. Common results:
+All public APIs return a `uni_uslp_status_t` code. Common results:
 - UNI_USLP_ERROR_INVALID_FRAME: malformed/truncated frame fields
 - UNI_USLP_ERROR_BUFFER_TOO_SMALL: insufficient output/scratch capacity
 - UNI_USLP_ERROR_CRC_MISMATCH: FECF failed
 - UNI_USLP_ERROR_INVALID_PARAM: bad IDs or inconsistent configuration
 - UNI_USLP_ERROR_UNSUPPORTED: feature/combination not enabled
-- UNI_USLP_ERROR_SDLS_FAILURE: SDLS tag mismatch, nonce/IV issue, or anti‑replay rejection
-Use [uni_ccsds_uslp_status_string()](include/uni_ccsds_uslp.h:1903) to print messages.
+- UNI_USLP_ERROR_SDLS_SA_NOT_FOUND / _MAC_FAILURE / _REPLAY / _OUT_OF_WINDOW / _LENGTH: SDLS rejection by reason (counted per VC, `uni_ccsds_uslp_get_sdls_stats()`)
+- UNI_USLP_ERROR_SDLS_SN_NOT_RESTORED / _SN_EXHAUSTED: transmit SN protection
+- UNI_USLP_ERROR_SDLS_FAILURE: crypto backend failure
+Use `uni_ccsds_uslp_status_string()` to print messages.
 
 
 # 5. Performance and correctness notes
@@ -50,24 +53,23 @@ Use [uni_ccsds_uslp_status_string()](include/uni_ccsds_uslp.h:1903) to print mes
 - Avoid copies by:
   - Supplying SDUs that stay valid until the build completes (zero‑copy queueing)
   - Reusing the same frame buffer across transmissions
-  - Providing a large RX scratch buffer to avoid fallback to smaller stack temporary regions
+  - Providing an RX scratch buffer as large as the largest TFDF (SDLS decrypts into it); transmit protection is in place and needs no scratch buffer
 - Endianness/bit ordering: on‑the‑wire fields are MSB‑first; pack/unpack helpers handle host endianness.
-- CRC: polynomial [0x1021](3rdparty/uni.crypto/include/uni_crypto_crc16.h:22), initial value [0xFFFF](3rdparty/uni.crypto/include/uni_crypto_crc16.h:23).
+- CRC: polynomial `0x1021`, initial value `0xFFFF`.
 
 # 6. Configuration and limits
-- Frame length: up to [UNI_USLP_MAX_FRAME_LENGTH](include/uni_ccsds_uslp.h:44). Truncated frames length per VC (§Annex D), 6..32 bytes in this implementation.
+- Frame length: up to `UNI_USLP_MAX_FRAME_LENGTH`. Truncated frames length per VC (§Annex D), 6..32 bytes in this implementation.
 - VC/MAP IDs: VCID 0..63, MAP 0..15. SCID 0..65535.
 - VCF count: 0..7 octets (Table 4‑2). Sequence‑controlled and expedited lengths are configured independently.
 - FECF: CRC‑16/CCITT computed over all fields except FECF itself; when SDLS is enabled, the Security Header and Trailer are covered by FECF (USLP §6.3.8).
-- SDLS nonce/IV: IV = 0x00000000 || SN_be_8 (12 octets). Never reuse IV under the same key. On SN rollover, rotate key and reset anti‑replay window.
-- Anti‑replay: sliding window (default 64). Duplicate or too‑old frames are rejected by SDLS processing.
-- Key/SA rotation: rotate on mission policy or earlier if SN approaches wrap; zeroize retired keys.
+- SDLS: up to 16 SAs per context, 8 SPIs per VC, anti‑replay window up to 4096 frames, Security Header ≤ 64 octets. Profiles, anti‑replay modes and limits are in [uslp_sdls.md](uslp_sdls.md).
+- Key/SA rotation: `uni_ccsds_uslp_sdls_rekey_sa()` (restarts the SN space); rotate before the SN field is exhausted.
 
 
 ## 7. Examples
 
 ### 7.1 Build a USLP frame (MAPA, CRC‑16 FECF)
-Functions used: [uni_ccsds_uslp_init()](include/uni_ccsds_uslp.h:911) [uni_ccsds_uslp_configure_vc()](include/uni_ccsds_uslp.h:965) [uni_ccsds_uslp_configure_map()](include/uni_ccsds_uslp.h:981) [uni_ccsds_uslp_send_mapa()](include/uni_ccsds_uslp.h:1511) [uni_ccsds_uslp_build_frame()](include/uni_ccsds_uslp.h:1706) [uni_crypto_crc16_ccitt_verify()](3rdparty/uni.crypto/include/uni_crypto_crc16.h:81)
+Functions used: `uni_ccsds_uslp_init()` `uni_ccsds_uslp_configure_vc()` `uni_ccsds_uslp_configure_map()` `uni_ccsds_uslp_send_mapa()` `uni_ccsds_uslp_build_frame()` `uni_crypto_crc16_ccitt_verify()`
 
 ```c
 #include <stdio.h>
@@ -129,7 +131,7 @@ int main(void) {
 ```
 
 ### 7.2 Parse a received frame (header fields, payload, and errors)
-Functions used: [uni_ccsds_uslp_primary_header_unpack()](include/uni_ccsds_uslp.h:1824) [uni_ccsds_uslp_tfdf_header_unpack()](include/uni_ccsds_uslp.h:1856) [uni_ccsds_uslp_accept_frame()](include/uni_ccsds_uslp.h:1756)
+Functions used: `uni_ccsds_uslp_primary_header_unpack()` `uni_ccsds_uslp_tfdf_header_unpack()` `uni_ccsds_uslp_accept_frame()`
 
 ```c
 #include <stdio.h>
@@ -176,251 +178,17 @@ int main(void) {
 }
 ```
 
-### 7.3 SDLS AES‑CCM‑128 protect/verify
-Built‑in engine usage (recommended). Functions used: [uni_ccsds_uslp_register_builtin_sdls()](include/uni_ccsds_uslp.h:2009) [uni_ccsds_uslp_configure_sdls()](include/uni_ccsds_uslp.h:1013) [uni_ccsds_uslp_set_work_buffer()](include/uni_ccsds_uslp.h:947)
-
-```c
-// Example key (demo only; DO NOT use in production)
-static const uint8_t AES128_KEY[16] = {
-    0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F
-};
-
-uni_uslp_context_t ctx;
-uni_uslp_managed_params_t phys = {0};
-phys.fecf_capability = true;
-uni_ccsds_uslp_init(&ctx, /*SCID=*/0x1001, &phys);
-
-// Register built‑in SDLS engine once per context
-uni_ccsds_uslp_register_builtin_sdls(&ctx);
-
-// Configure SDLS on VCID 2 with AES‑CCM‑128, 16‑byte tag, anti‑replay window 64
-uni_uslp_sdls_config_t sdls = {0};
-sdls.enabled = true;
-sdls.suite = UNI_USLP_SDLS_SUITE_AES_CCM;
-sdls.spi = 0x42;
-sdls.key = AES128_KEY;
-sdls.key_length = sizeof(AES128_KEY);
-sdls.iv_length = 12;            // IV = 0x00000000 || SN_be_8
-sdls.mac_length = 16;           // AEAD tag length
-sdls.authentication_only = false;
-sdls.encryption_enabled = true;
-sdls.anti_replay_enabled = true;
-sdls.anti_replay_window = 64;
-sdls.sec_header_present = true; sdls.sec_trailer_present = true;
-sdls.sec_header_length = 9;     // SPI(1)+SN(8)
-sdls.sec_trailer_length = 16;   // ICV/tag
-uni_ccsds_uslp_configure_sdls(&ctx, /*VCID=*/2, &sdls);
-
-// Provide RX scratch buffer (required when SDLS is enabled)
-static uint8_t rx_scratch[1024];
-uni_ccsds_uslp_set_work_buffer(&ctx, rx_scratch, sizeof(rx_scratch));
-```
-
-### 7.4 End‑to‑end: USLP + SDLS (TX and RX), tag verify and replay protection
-Functions used: [uni_ccsds_uslp_send_mapa()](include/uni_ccsds_uslp.h:1511) [uni_ccsds_uslp_build_frame()](include/uni_ccsds_uslp.h:1706) [uni_ccsds_uslp_accept_frame()](include/uni_ccsds_uslp.h:1756)
-
-```c
-#include <stdio.h>
-#include <string.h>
-#include "uni_ccsds_uslp.h"
-#include "uni_ccsds_uslp_internal.h"
-
-static void rx_cb(uni_uslp_context_t* c, uint8_t vcid, uint8_t map,
-                  uni_uslp_service_type_t svc, const uint8_t* sdu, size_t len,
-                  uni_uslp_verification_status_t ver, bool gap, void* ud) {
-    (void)c;(void)ud;(void)gap;
-    printf("[RX ver=%d] SDU (%zu B):", (int)ver, len);
-    for(size_t i=0;i<len;i++) printf(" %02X", sdu[i]);
-    printf("\n");
-}
-
-int main(void) {
-    const uint8_t VCID=2, MAP=1; // same VC/MAP on TX and RX sides
-    static const uint8_t PLAINTEXT[] = { 0x01,0x02,0x03,0x04,0x05 };
-    static const uint8_t KEY[16] = { 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 };
-
-    // TX side
-    uni_uslp_context_t tx;
-    uni_uslp_managed_params_t phys = (uni_uslp_managed_params_t){0};
-    phys.fecf_capability = true;
-    uni_ccsds_uslp_init(&tx, /*SCID=*/0x2222, &phys);
-    uni_uslp_managed_params_t vc = phys; vc.vcf_seq_count_len_octets = 1;
-    uni_ccsds_uslp_configure_vc(&tx, VCID, &vc);
-    uni_uslp_managed_params_t map = phys; map.max_sdu_length = 2048;
-    uni_ccsds_uslp_configure_map(&tx, VCID, MAP, UNI_USLP_SERVICE_MAPA, &map);
-    uni_ccsds_uslp_register_builtin_sdls(&tx);
-    uni_uslp_sdls_config_t sd = {0};
-    sd.enabled=true; sd.suite=UNI_USLP_SDLS_SUITE_AES_CCM; sd.key=KEY; sd.key_length=16;
-    sd.iv_length=12; sd.mac_length=16; sd.sec_header_present=sd.sec_trailer_present=true;
-    sd.sec_header_length=9; sd.sec_trailer_length=16; sd.anti_replay_enabled=true; sd.anti_replay_window=64;
-    uni_ccsds_uslp_configure_sdls(&tx, VCID, &sd);
-    uni_ccsds_uslp_send_mapa(&tx, VCID, MAP, PLAINTEXT, sizeof(PLAINTEXT));
-    uint8_t frame[256]; size_t flen=sizeof(frame);
-    uni_uslp_status_t st = uni_ccsds_uslp_build_frame(&tx, VCID, MAP, frame, &flen);
-    if (st != UNI_USLP_SUCCESS) { fprintf(stderr,"TX build: %s\n", uni_ccsds_uslp_status_string(st)); return 1; }
-
-    // RX side
-    uni_uslp_context_t rx;
-    uni_ccsds_uslp_init(&rx, /*SCID=*/0x2222, &phys);
-    uni_ccsds_uslp_configure_vc(&rx, VCID, &vc);
-    uni_ccsds_uslp_configure_map(&rx, VCID, MAP, UNI_USLP_SERVICE_MAPA, &map);
-    uni_ccsds_uslp_register_builtin_sdls(&rx);
-    uni_ccsds_uslp_configure_sdls(&rx, VCID, &sd); // same SA/key
-    static uint8_t scratch[1024]; uni_ccsds_uslp_set_work_buffer(&rx, scratch, sizeof(scratch));
-    uni_ccsds_uslp_register_sdu_callback(&rx, VCID, MAP, rx_cb, NULL);
-
-    // 1) Happy path — decrypt and verify
-    st = uni_ccsds_uslp_accept_frame(&rx, frame, flen);
-    if (st != UNI_USLP_SUCCESS) { fprintf(stderr,"RX accept (good): %s\n", uni_ccsds_uslp_status_string(st)); return 2; }
-
-    // 2) Tamper — flip 1 bit in AEAD tag: expect UNI_USLP_ERROR_SDLS_FAILURE
-    frame[flen-1] ^= 0x01;
-    st = uni_ccsds_uslp_accept_frame(&rx, frame, flen);
-    printf("Tamper accept -> %s\n", uni_ccsds_uslp_status_string(st)); // should report SDLS failure
-    frame[flen-1] ^= 0x01; // restore
-
-    // 3) Replay — re‑send the same frame: expect anti‑replay rejection
-    st = uni_ccsds_uslp_accept_frame(&rx, frame, flen);
-    printf("Replay accept -> %s\n", uni_ccsds_uslp_status_string(st)); // SDLS failure (replay window)
-    return 0;
-}
-```
-
-### 7.5 Optional: custom SDLS engine with OpenSSL AES‑CCM‑128
-Register your own Apply/Process callbacks via [uni_ccsds_uslp_register_sdls_callbacks()](include/uni_ccsds_uslp.h:1212). Minimal AES‑CCM‑128 example (no dynamic allocation; IV derived from SN per USLP §6):
-
-```c
-#include <openssl/evp.h>
-typedef struct { /* optional hooks & replay state per VC */
-    uint64_t rx_highest_sn;
-    uint64_t rx_bitmap; // LSB = highest seen
-} sdls_vc_state;
-
-static int window_accept(sdls_vc_state* s, uint8_t W, uint64_t sn) {
-    if (W==0||W>64) W=64;
-    if (!s->rx_bitmap) { s->rx_highest_sn=sn; s->rx_bitmap=1ull; return 1; }
-    if (sn > s->rx_highest_sn) {
-        uint64_t d = sn - s->rx_highest_sn;
-       s->rx_bitmap = (d>=64)?1ull:(s->rx_bitmap<<d)|1ull;
-        s->rx_highest_sn = sn;
-        return 1;
-    } else {
-        uint64_t off = s->rx_highest_sn - sn;
-        if (off >= W) return 0;
-        uint64_t mask = 1ull<<off;
-        if (s->rx_bitmap & mask) return 0;
-        s->rx_bitmap |= mask;
-        return 1;
-    }
-}
-
-static void iv_from_sn(uint8_t iv[12], uint64_t sn){ memset(iv,0,4); for(int i=0;i<8;i++) iv[4+i]=(uint8_t)(sn>>(56-8*i)); }
-
-static uni_uslp_status_t sdls_apply_openssl(uni_uslp_context_t* ctx, uint8_t vcid,
-    const uint8_t* in, size_t in_len, uint8_t* out, size_t* out_len,
-    const uni_uslp_sdls_config_t* cfg, void* user_data) {
-    (void)ctx;(void)user_data;(void)vcid;
-    if (cfg->suite != UNI_USLP_SDLS_SUITE_AES_CCM) return UNI_USLP_ERROR_INVALID_PARAM;
-    if (*out_len < (size_t)(cfg->sec_header_length + in_len + cfg->sec_trailer_length)) return UNI_USLP_ERROR_BUFFER_TOO_SMALL;
-    uint64_t sn = 0; /* keep SN in your per‑VC state; increment per TX */
-    out[0]=cfg->spi; for (int i=0;i<8;i++) out[1+i]=(uint8_t)(sn>>(56-8*i));
-    uint8_t iv[12]; iv_from_sn(iv, sn);
-    EVP_CIPHER_CTX* c = EVP_CIPHER_CTX_new();
-    int ok = c && EVP_EncryptInit_ex(c, EVP_aes_128_ccm(), NULL, NULL, NULL) == 1
-               && EVP_CIPHER_CTX_ctrl(c, EVP_CTRL_AEAD_SET_IVLEN, cfg->iv_length, NULL) == 1
-               && EVP_CIPHER_CTX_ctrl(c, EVP_CTRL_AEAD_SET_TAG, cfg->mac_length, NULL) == 1
-               && EVP_EncryptInit_ex(c, NULL, NULL, cfg->key, iv) == 1;
-    int len=0; ok = ok && EVP_EncryptUpdate(c, NULL, &len, NULL, (int)in_len) == 1;
-    ok = ok && EVP_EncryptUpdate(c, NULL, &len, NULL, 0) == 1; // AAD = none
-    ok = ok && EVP_EncryptUpdate(c, out + cfg->sec_header_length, &len, in, (int)in_len) == 1;
-    ok = ok && EVP_EncryptFinal_ex(c, NULL, &len) == 1;
-    ok = ok && EVP_CIPHER_CTX_ctrl(c, EVP_CTRL_AEAD_GET_TAG, cfg->mac_length,
-                                   out + cfg->sec_header_length + in_len) == 1;
-    EVP_CIPHER_CTX_free(c);
-    if (!ok) return UNI_USLP_ERROR_SDLS_FAILURE;
-    *out_len = (size_t)(cfg->sec_header_length + in_len + cfg->sec_trailer_length);
-    return UNI_USLP_SUCCESS;
-}
-
-static uni_uslp_status_t sdls_process_openssl(uni_uslp_context_t* ctx, uint8_t vcid,
-    const uint8_t* in, size_t in_len, uint8_t* out, size_t* out_len,
-    const uni_uslp_sdls_config_t* cfg, void* user_data, uint64_t* out_sn) {
-    (void)ctx;
-    sdls_vc_state* state = (sdls_vc_state*)user_data; (void)vcid;
-    if (cfg->suite != UNI_USLP_SDLS_SUITE_AES_CCM || cfg->sec_header_length != 9) return UNI_USLP_ERROR_INVALID_PARAM;
-    if (in_len < (size_t)(cfg->sec_header_length + cfg->sec_trailer_length)) return UNI_USLP_ERROR_INVALID_FRAME;
-    const uint8_t* sh = in;
-    uint64_t sn = 0; for(int i=0;i<8;i++) sn = (sn<<8) | sh[1+i];
-    if (out_sn) *out_sn = sn;
-    if (!window_accept(state, cfg->anti_replay_window, sn)) return UNI_USLP_ERROR_SDLS_FAILURE;
-    const uint8_t* ct = in + cfg->sec_header_length;
-    size_t ct_len = in_len - cfg->sec_header_length - cfg->sec_trailer_length;
-    const uint8_t* tag = in + in_len - cfg->sec_trailer_length;
-    if (*out_len < ct_len) return UNI_USLP_ERROR_BUFFER_TOO_SMALL;
-    uint8_t iv[12]; iv_from_sn(iv, sn);
-    EVP_CIPHER_CTX* c = EVP_CIPHER_CTX_new();
-    int ok = c && EVP_DecryptInit_ex(c, EVP_aes_128_ccm(), NULL, NULL, NULL) == 1
-               && EVP_CIPHER_CTX_ctrl(c, EVP_CTRL_AEAD_SET_IVLEN, cfg->iv_length, NULL) == 1
-               && EVP_DecryptInit_ex(c, NULL, NULL, cfg->key, iv) == 1
-               && EVP_CIPHER_CTX_ctrl(c, EVP_CTRL_AEAD_SET_TAG, cfg->mac_length, (void*)tag) == 1;
-    int len=0; ok = ok && EVP_DecryptUpdate(c, NULL, &len, NULL, (int)ct_len) == 1;
-    ok = ok && EVP_DecryptUpdate(c, NULL, &len, NULL, 0) == 1; // AAD = none
-    ok = ok && EVP_DecryptUpdate(c, out, &len, ct, (int)ct_len) == 1;
-    ok = ok && EVP_DecryptFinal_ex(c, NULL, &len) == 1;
-    EVP_CIPHER_CTX_free(c);
-    if (!ok) return UNI_USLP_ERROR_SDLS_FAILURE;
-    *out_len = ct_len;
-    return UNI_USLP_SUCCESS;
-}
-```
+### 7.3 SDLS
+The SDLS API (Security Associations, per‑VC configuration, built‑in and custom engines) and a complete example are in
+[uslp_sdls.md](uslp_sdls.md). The example source, [examples/sdls_quickstart.c](../examples/sdls_quickstart.c), is
+compiled and run by ctest.
 
 ## 8. Quick Start
 
+[examples/sdls_quickstart.c](../examples/sdls_quickstart.c) builds an AES‑256‑GCM protected frame with FECF, accepts
+it, and shows replay and tamper rejection. Build the library and run it:
 
-This minimal program builds a protected frame (AES‑CCM‑128 + FECF), then parses and verifies it.
-
-```c
-#include <stdio.h>
-#include "uni_ccsds_uslp.h"
-#include "uni_ccsds_uslp_internal.h"
-
-static void rx(uni_uslp_context_t* c, uint8_t vcid, uint8_t map, uni_uslp_service_type_t svc,
-               const uint8_t* sdu, size_t len, uni_uslp_verification_status_t ver, bool gap, void* ud) {
-    (void)c;(void)ud;(void)gap;(void)svc;
-    printf("Verified SDU (%zu B):", len); for(size_t i=0;i<len;i++) printf(" %02X", sdu[i]); printf("\n");
-}
-int main(void){
-  const uint8_t VCID=2, MAP=1; const uint16_t SCID=0x6001;
-  static const uint8_t KEY[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-  static const uint8_t SDU[]={ 'h','e','l','l','o' };
-  uni_uslp_context_t tx, rxctx; uni_uslp_managed_params_t p={0}; p.fecf_capability=true;
-  uni_ccsds_uslp_init(&tx, SCID, &p); uni_ccsds_uslp_init(&rxctx, SCID, &p);
-  uni_uslp_managed_params_t v=p; v.vcf_seq_count_len_octets=1;
-  uni_ccsds_uslp_configure_vc(&tx, VCID, &v); uni_ccsds_uslp_configure_vc(&rxctx, VCID, &v);
-  uni_uslp_managed_params_t m=p; m.max_sdu_length=2048;
-  uni_ccsds_uslp_configure_map(&tx, VCID, MAP, UNI_USLP_SERVICE_MAPA, &m);
-  uni_ccsds_uslp_configure_map(&rxctx, VCID, MAP, UNI_USLP_SERVICE_MAPA, &m);
-  uni_ccsds_uslp_register_builtin_sdls(&tx); uni_ccsds_uslp_register_builtin_sdls(&rxctx);
-  uni_uslp_sdls_config_t cfg={0}; cfg.enabled=true; cfg.suite=UNI_USLP_SDLS_SUITE_AES_CCM; cfg.key=KEY; cfg.key_length=16;
-  cfg.iv_length=12; cfg.mac_length=16; cfg.sec_header_present=cfg.sec_trailer_present=true; cfg.sec_header_length=9; cfg.sec_trailer_length=16;
-  cfg.anti_replay_enabled=true; cfg.anti_replay_window=64;
-  uni_ccsds_uslp_configure_sdls(&tx, VCID, &cfg); uni_ccsds_uslp_configure_sdls(&rxctx, VCID, &cfg);
-  static uint8_t scratch[1024]; uni_ccsds_uslp_set_work_buffer(&rxctx, scratch, sizeof(scratch));
-  uni_ccsds_uslp_register_sdu_callback(&rxctx, VCID, MAP, rx, NULL);
-  uni_ccsds_uslp_send_mapa(&tx, VCID, MAP, SDU, sizeof(SDU));
-  uint8_t frame[256]; size_t fl=sizeof(frame);
-  uni_uslp_status_t st=uni_ccsds_uslp_build_frame(&tx, VCID, MAP, frame, &fl);
-  if(st!=UNI_USLP_SUCCESS){ fprintf(stderr,"build: %s\n", uni_ccsds_uslp_status_string(st)); return 1; }
-  st=uni_ccsds_uslp_accept_frame(&rxctx, frame, fl);
-  if(st!=UNI_USLP_SUCCESS){ fprintf(stderr,"accept: %s\n", uni_ccsds_uslp_status_string(st)); return 2; }
-  return 0;
-}
+```bash
+cmake -S . -B build && cmake --build build -j
+ctest --test-dir build -R uni_ccsds_example_sdls_quickstart --output-on-failure
 ```
-
-Compile and run (Linux/macOS)
-- Build library: cmake -S . -B build && cmake --build build -j
-- Build quick start:
-  - gcc -std=c11 -I include -I 3rdparty/uni.crypto/include quickstart.c -o quickstart \
-    build/libuni_ccsds.a build/3rdparty/uni.crypto/libuni_crypto.a -lmbedcrypto
-- Run: ./quickstart
-

@@ -174,27 +174,26 @@ TEST_CASE("MAPP + SDLS HMAC: verify tag, replay reject, tamper fail", "[mapp][sd
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, VC, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_map(&ctx, VC, MAP, UNI_USLP_SERVICE_PACKET, &p) == UNI_USLP_SUCCESS);
 
-    // SDLS HMAC config (Header=SPI(1)+SN(8)=9, Trailer=16)
+    // SDLS HMAC config (Header=SPI(2)+SN(8)=10, Trailer=16)
     static const uint8_t key[] = {
         0x10,0x11,0x12,0x13,0x21,0x22,0x23,0x24,0x30,0x31,0x32,0x33,0x44,0x55,0x66,0x77,
         0x88,0x99,0xAA,0xBB,0xCC,0xDD,0xEE,0xFF,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08
     };
-    uni_uslp_sdls_config_t sdls{};
+    // SDLS HMAC-SHA-256 SA: Security Header = SPI(2) + SN(8), Trailer = 16-octet truncated MAC
+    uni_uslp_sdls_sa_config_t sa{};
+    sa.spi = 5;
+    sa.suite = UNI_USLP_SDLS_SUITE_HMAC_SHA256;
+    sa.sn_length = 8;
+    sa.mac_length = 16;
+    sa.anti_replay_enabled = true;
+    sa.anti_replay_window = 64;
+    REQUIRE(uni_ccsds_uslp_sdls_add_sa(&ctx, &sa, key, sizeof(key)) == UNI_USLP_SUCCESS);
+
+    uni_uslp_sdls_vc_config_t sdls{};
     sdls.enabled = true;
-    sdls.spi = 5;
-    sdls.iv_length = 0;
-    sdls.mac_length = 16;
-    sdls.authentication_only = true;
-    sdls.encryption_enabled = false;
-    sdls.suite = UNI_USLP_SDLS_SUITE_HMAC_SHA256;
-    sdls.key = key;
-    sdls.key_length = sizeof(key);
-    sdls.anti_replay_enabled = true;
-    sdls.anti_replay_window = 64;
-    sdls.sec_header_present = true;
-    sdls.sec_trailer_present = true;
-    sdls.sec_header_length = 9;
-    sdls.sec_trailer_length = 16;
+    sdls.tx_spi = 5;
+    sdls.rx_spi_count = 1;
+    sdls.rx_spis[0] = 5;
     REQUIRE(uni_ccsds_uslp_configure_sdls(&ctx, VC, &sdls) == UNI_USLP_SUCCESS);
 
     // SDU capture
@@ -217,12 +216,19 @@ TEST_CASE("MAPP + SDLS HMAC: verify tag, replay reject, tamper fail", "[mapp][sd
     REQUIRE(cap.ver == UNI_USLP_VERIF_SUCCESS);
 
     // Replay rejected
-    REQUIRE(uni_ccsds_uslp_accept_frame(&ctx, frame.data(), frame.size()) == UNI_USLP_ERROR_SDLS_FAILURE);
+    REQUIRE(uni_ccsds_uslp_accept_frame(&ctx, frame.data(), frame.size()) == UNI_USLP_ERROR_SDLS_REPLAY);
 
-    // Tamper: flip last byte — should fail SDLS verification
-    std::vector<uint8_t> tampered = frame;
+    // Tamper a fresh frame (a not yet accepted SN, so the MAC check rejects it rather than anti-replay)
+    REQUIRE(uni_ccsds_uslp_send_packet_ex(&ctx, VC, MAP, pkt.data(), pkt.size(), 0u, false, 0u) == UNI_USLP_SUCCESS);
+    std::vector<uint8_t> tampered(512);
+    size_t tampered_len = tampered.size();
+    REQUIRE(uni_ccsds_uslp_build_frame(&ctx, VC, MAP, tampered.data(), &tampered_len) == UNI_USLP_SUCCESS);
+    tampered.resize(tampered_len);
     tampered.back() ^= 0x01;
-    REQUIRE(uni_ccsds_uslp_accept_frame(&ctx, tampered.data(), tampered.size()) == UNI_USLP_ERROR_SDLS_FAILURE);
+    REQUIRE(uni_ccsds_uslp_accept_frame(&ctx, tampered.data(), tampered.size()) == UNI_USLP_ERROR_SDLS_MAC_FAILURE);
+
+    // The SA table holds crypto backend state: release it.
+    REQUIRE(uni_ccsds_uslp_free(&ctx) == UNI_USLP_SUCCESS);
 }
 
 // Additional tests for MAPP PQI (USLP-14) — appended by Roo

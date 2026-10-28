@@ -13,11 +13,12 @@
  * - Frame acceptance with CRC verification and TFDF header parse and SDU callback
  *
  * Notes:
- * - This is an incremental implementation focused on §4.1 (frame format) and
- *   §4.2/§4.3 core path for MAPA on variable-length frames without Insert Zone or OCF.
- * - FECF is supported (Annex B) when enabled by managed parameters.
- * - OCF and Insert Zone are currently not emitted; OID and Truncated frames are not yet implemented here.
- * - Segmentation, blocking, multiplexing policy, and SDLS hooks are TODO.
+ * - Frame build covers MAPA, MAPP, VCP, VCA and Octet Stream SDUs that fit in one frame (no segmentation or
+ *   blocking on transmit), fixed- and variable-length frames, Insert Zone, OCF and FECF (Annex B).
+ * - Frame accept covers the same services plus truncated frames (Annex D); OID frames are built in
+ *   uni_ccsds_lfsr_oid.c.
+ * - The SDLS option (§6) calls the registered ApplySecurity / ProcessSecurity callbacks with the whole frame; the
+ *   built-in engine and the Security Association table are in uni_ccsds_uslp_sdls.c.
  */
 
 #include <string.h>
@@ -212,7 +213,7 @@ uni_uslp_status_t uni_ccsds_uslp_reset(uni_uslp_context_t *context)
         vc->out_of_order_frames = 0u;
         vc->wraps = 0u;
         vc->vcf_frames_with_field = 0u;
-        memset(&vc->sdls_rt, 0, sizeof(vc->sdls_rt));
+        memset(&vc->sdls_stats, 0, sizeof(vc->sdls_stats));
 
         /* Clear schedulers (USLP-96/USLP-99) */
         vc->sched_last_map_rr = 0xFF; /* none */
@@ -229,6 +230,10 @@ uni_uslp_status_t uni_ccsds_uslp_reset(uni_uslp_context_t *context)
         vc->insert_pending_length = 0u;
     }
 
+    /* SDLS: a reset starts a new link session. Keys and transmit SNs are kept (rewinding the SN would reuse IVs);
+     * receive anti-replay state is cleared and SAs with require_sn_restore wait for their SN (CCSDS 355.0-B-2 §4.2.3.4). */
+    uni_ccsds_uslp_sdls_reset_sessions(context);
+
     /* Reset VC RR scheduler (USLP-99/USLP-101) */
     context->sched_last_vc_rr = 0xFF;
 
@@ -243,7 +248,8 @@ uni_uslp_status_t uni_ccsds_uslp_reset(uni_uslp_context_t *context)
 uni_uslp_status_t uni_ccsds_uslp_free(uni_uslp_context_t *context)
 {
     UNI_USLP_CHECK_NULL(context);
-    /* No dynamic allocations by default; nothing to free. */
+    /* The context itself is caller-owned; only the SA crypto backends hold resources (and key schedules). */
+    uni_ccsds_uslp_sdls_free_all(context);
     memset(context, 0, sizeof(*context));
     return UNI_USLP_SUCCESS;
 }
@@ -329,13 +335,36 @@ uni_uslp_status_t uni_ccsds_uslp_set_mux_policy(uni_uslp_context_t *context, uin
     return UNI_USLP_SUCCESS;
 }
 
-uni_uslp_status_t uni_ccsds_uslp_configure_sdls(uni_uslp_context_t *context, uint8_t vcid, const uni_uslp_sdls_config_t *config)
+uni_uslp_status_t uni_ccsds_uslp_configure_sdls(uni_uslp_context_t *context, uint8_t vcid, const uni_uslp_sdls_vc_config_t *config)
 {
     UNI_USLP_CHECK_NULL(context);
     UNI_USLP_CHECK_NULL(config);
     uni_uslp_vc_state_t* vc = uni_ccsds_uslp_get_vc_state(context, vcid);
     if (!vc) return UNI_USLP_ERROR_INVALID_PARAM;
+
+    /* Validate at configuration time (CCSDS 355.0-B-2 §4.2.2.2: every SA used on a GVCID exists). */
+    if (config->enabled) {
+        if (config->rx_spi_count > UNI_USLP_SDLS_MAX_SPI_PER_VC) return UNI_USLP_ERROR_INVALID_PARAM;
+        if (config->tx_spi == 0u && config->rx_spi_count == 0u) return UNI_USLP_ERROR_INVALID_PARAM;
+        if (config->tx_spi != 0u && !uni_ccsds_uslp_sdls_find_sa(context, config->tx_spi)) return UNI_USLP_ERROR_SDLS_SA_NOT_FOUND;
+        for (uint8_t i = 0; i < config->rx_spi_count; ++i) {
+            const uni_uslp_sdls_sa_t* sa = uni_ccsds_uslp_sdls_find_sa(context, config->rx_spis[i]);
+            if (!sa) return UNI_USLP_ERROR_SDLS_SA_NOT_FOUND;
+            /* The receiver reads the SPI before it knows the SA, so one VC cannot mix SPI field lengths. */
+            const uni_uslp_sdls_sa_t* first = uni_ccsds_uslp_sdls_find_sa(context, config->rx_spis[0]);
+            if (sa->config.format != first->config.format) return UNI_USLP_ERROR_INVALID_PARAM;
+        }
+    }
     vc->sdls_config = *config;
+    return UNI_USLP_SUCCESS;
+}
+
+uni_uslp_status_t uni_ccsds_uslp_get_sdls_stats(const uni_uslp_context_t *context, uint8_t vcid, uni_uslp_sdls_stats_t *out_stats)
+{
+    UNI_USLP_CHECK_NULL(context);
+    UNI_USLP_CHECK_NULL(out_stats);
+    if (vcid >= UNI_USLP_MAX_VIRTUAL_CHANNELS) return UNI_USLP_ERROR_INVALID_PARAM;
+    *out_stats = context->vcs[vcid].sdls_stats;
     return UNI_USLP_SUCCESS;
 }
 
@@ -1290,10 +1319,21 @@ uni_uslp_status_t uni_ccsds_uslp_build_frame(uni_uslp_context_t *context, uint8_
     size_t  tfdf_hdr_len = 1u; /* Will be set per rule: 3 if pointer present (rules 000/001/010), else 1. */
     const size_t  fecf_len   = fecf_length_if_present(context);
     const uni_uslp_fecf_tx_mode_t fecf_mode = fecf_tx_mode(context);
-    /* SDLS presence and lengths per USLP §6.6.2 (managed parameters) */
+    /* SDLS presence and lengths (USLP §6.6.2): taken from the SA the VC applies on transmit (355.0-B-2 §4.2.3.2.1) */
     const bool    sdls_on    = (vc->sdls_config.enabled && context->sdls_apply_callback != NULL);
-    const size_t  sec_hdr_len = (sdls_on && vc->sdls_config.sec_header_present) ? (size_t)vc->sdls_config.sec_header_length : 0u;
-    const size_t  sec_trl_len = (sdls_on && vc->sdls_config.sec_trailer_present) ? (size_t)vc->sdls_config.sec_trailer_length : 0u;
+    size_t sec_hdr_len = 0u;
+    size_t sec_trl_len = 0u;
+    if (sdls_on) {
+        const uni_uslp_sdls_sa_t* sa = uni_ccsds_uslp_sdls_find_sa(context, vc->sdls_config.tx_spi);
+        if (!sa) {
+            return UNI_USLP_ERROR_SDLS_SA_NOT_FOUND;
+        }
+        if (sa->config.map_ids != 0u && (sa->config.map_ids & (1u << (map_id & 0x0Fu))) == 0u) {
+            return UNI_USLP_ERROR_SDLS_SA_NOT_FOUND; /* SA not associated with this GMAP_ID (§4.2.2.2.1) */
+        }
+        sec_hdr_len = uni_ccsds_uslp_sdls_header_length(&sa->config);
+        sec_trl_len = sa->config.mac_length;
+    }
 
     if (is_octet_stream) {
         /* Octet Stream requires variable-length frames (§2.2.4.6, §2.2.5 g). */
@@ -1413,33 +1453,42 @@ uni_uslp_status_t uni_ccsds_uslp_build_frame(uni_uslp_context_t *context, uint8_
     size_t tfdz_copy_len = sdu_len;
 
     if (sdls_on) {
-        /* Build TFDF header + TFDZ at a temporary position after SecHeader space, then invoke SDLS.Apply.
-         * Input: TFDF header + TFDZ; Output: SecHeader + Protected TFDF’ + SecTrailer (USLP §6.3.4–§6.3.6). */
-        size_t tfdf_pos = off + sec_hdr_len;
+        /* Build TFDF header + TFDZ after the space reserved for the Security Header, then invoke ApplySecurity, which
+         * writes the Security Header, protects the TFDF in place and appends the Security Trailer (USLP §6.3.4–§6.3.6;
+         * 355.0-B-2 §4.2.3). The callback sees the whole frame so the Primary Header is authenticated (§4.2.2.6.2). */
+        const size_t tfdf_pos = off + sec_hdr_len;
+        if (buf_cap < tfdf_pos) return UNI_USLP_ERROR_BUFFER_TOO_SMALL;
         size_t th_written = 0;
         st = uni_ccsds_uslp_tfdf_header_pack(&th, &frame_buffer[tfdf_pos], buf_cap - tfdf_pos, &th_written);
         if (st != UNI_USLP_SUCCESS) return st;
-        if (buf_cap < tfdf_pos + th_written + tfdz_copy_len) return UNI_USLP_ERROR_BUFFER_TOO_SMALL;
-        memcpy(&frame_buffer[tfdf_pos + th_written], map->send_buffer, tfdz_copy_len);
-        size_t in_len = th_written + tfdz_copy_len;
 
-        /* Expected output length equals sec_hdr + in + sec_trailer per managed params (USLP-176..179). */
-        size_t out_len = sec_hdr_len + in_len + sec_trl_len;
-        st = context->sdls_apply_callback(
-                context,
-                vcid,
-                &frame_buffer[tfdf_pos], in_len,
-                &frame_buffer[off], &out_len,
-                &vc->sdls_config,
-                context->sdls_user_data);
+        /* Fixed-length frames: the TFDZ fills the frame up to the Security Trailer, OCF and FECF; pad it with idle
+         * octets before protection so the padding is covered by the MAC (USLP §4.1.4.1.3). */
+        size_t tfdz_len = tfdz_copy_len;
+        if (fixed_length) {
+            const size_t overhead = tfdf_pos + th_written + sec_trl_len + ocf_len + fecf_len;
+            if (total < overhead) return UNI_USLP_ERROR_INVALID_PARAM;
+            if (tfdz_copy_len > total - overhead) return UNI_USLP_ERROR_UNSUPPORTED; /* no segmentation in this path */
+            tfdz_len = total - overhead;
+        }
+        if (buf_cap < tfdf_pos + th_written + tfdz_len + sec_trl_len) return UNI_USLP_ERROR_BUFFER_TOO_SMALL;
+        memcpy(&frame_buffer[tfdf_pos + th_written], map->send_buffer, tfdz_copy_len);
+        if (tfdz_len > tfdz_copy_len) {
+            memset(&frame_buffer[tfdf_pos + th_written + tfdz_copy_len], UNI_USLP_DEFAULT_IDLE_FILLER, tfdz_len - tfdz_copy_len);
+        }
+        const size_t in_len = th_written + tfdz_len;
+
+        const uni_uslp_sdls_frame_layout_t layout = {
+            .vcid = vcid,
+            .map_id = map_id,
+            .primary_header_length = ph_written,
+            .insert_zone_length = insert_len,
+        };
+        st = context->sdls_apply_callback(context, &layout, vc->sdls_config.tx_spi, frame_buffer, in_len, context->sdls_user_data);
         if (st != UNI_USLP_SUCCESS) {
-            return UNI_USLP_ERROR_SDLS_FAILURE;
+            return st;
         }
-        /* Validate produced length matches managed parameters (defensive check) */
-        if (out_len != (sec_hdr_len + in_len + sec_trl_len)) {
-            return UNI_USLP_ERROR_SDLS_FAILURE;
-        }
-        off += out_len;
+        off = tfdf_pos + in_len + sec_trl_len;
     } else {
         /* No SDLS: emit TFDF header then TFDZ plainly */
         size_t th_written = 0;
@@ -1954,30 +2003,40 @@ uni_uslp_status_t uni_ccsds_uslp_accept_frame(uni_uslp_context_t *context, const
     uni_uslp_verification_status_t ver = UNI_USLP_VERIF_NOT_APPLICABLE;
 
     if (sdls_on) {
-        size_t in_len = frame_length - off - ocf_len - fecf_len;
+        const size_t in_len = frame_length - off - ocf_len - fecf_len;
         if (in_len == 0) return UNI_USLP_ERROR_INVALID_FRAME;
         if (!context->frame_buffer || context->frame_buffer_size == 0) {
             return UNI_USLP_ERROR_BUFFER_TOO_SMALL;
         }
+        const uni_uslp_sdls_frame_layout_t layout = {
+            .vcid = vcid,
+            .map_id = map_id,
+            .primary_header_length = ph_read,
+            .insert_zone_length = insert_len,
+        };
         size_t out_len = context->frame_buffer_size;
-        uint64_t sdls_seqnum = 0;
-        st = context->sdls_process_callback(
-                context,
-                vcid,
-                &frame_data[off], in_len,
-                context->frame_buffer, &out_len,
-                &vc->sdls_config,
-                context->sdls_user_data,
-                &sdls_seqnum);
+        uni_uslp_sdls_rx_info_t info;
+        memset(&info, 0, sizeof(info));
+        st = context->sdls_process_callback(context, &layout, frame_data, in_len, context->frame_buffer, &out_len, &info,
+                                            context->sdls_user_data);
+        /* Per-reason accounting for monitoring and incident analysis (frames are discarded on any failure,
+         * 355.0-B-2 §4.2.4.3 b, §4.2.4.4 e, h, i). */
+        uni_uslp_sdls_stats_t* stats = &vc->sdls_stats;
+        switch (st) {
+            case UNI_USLP_SUCCESS:                  stats->frames_verified++; break;
+            case UNI_USLP_ERROR_SDLS_SA_NOT_FOUND:  stats->sa_not_found++;    break;
+            case UNI_USLP_ERROR_SDLS_MAC_FAILURE:   stats->mac_failures++;    break;
+            case UNI_USLP_ERROR_SDLS_REPLAY:        stats->replays++;         break;
+            case UNI_USLP_ERROR_SDLS_OUT_OF_WINDOW: stats->out_of_window++;   break;
+            case UNI_USLP_ERROR_SDLS_LENGTH:        stats->length_errors++;   break;
+            default:                                stats->other_errors++;    break;
+        }
         if (st != UNI_USLP_SUCCESS) {
-            return UNI_USLP_ERROR_SDLS_FAILURE;
+            return st;
         }
         payload_ptr = context->frame_buffer;
         payload_len = out_len;
-        /* SDLS verification succeeded. If suite is NULL transform, treat as NOT_APPLICABLE; else SUCCESS. */
-        ver = (vc->sdls_config.suite == UNI_USLP_SDLS_SUITE_NULL)
-              ? UNI_USLP_VERIF_NOT_APPLICABLE
-              : UNI_USLP_VERIF_SUCCESS;
+        ver = info.verification;
     } else {
         payload_ptr = &frame_data[off];
         payload_len = frame_length - off - ocf_len - fecf_len;
