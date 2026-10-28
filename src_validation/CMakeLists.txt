@@ -8,7 +8,14 @@ project(uni_ccsds_validation LANGUAGES CXX)
 # Enable reusable modules that will live under src_validation/cmake
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-option(USLP_VALIDATION_WITH_NASA "Enable the NASA USLP reference bridge" ON)
+# The vendored NASA reference (3rdparty/nasa-uslp) is POSIX-only (sys/time.h, UDP sockets), so it defaults to OFF on
+# Windows.
+if(WIN32)
+    set(__uslp_nasa_default OFF)
+else()
+    set(__uslp_nasa_default ON)
+endif()
+option(USLP_VALIDATION_WITH_NASA "Enable the NASA USLP reference bridge (POSIX only)" ${__uslp_nasa_default})
 option(USLP_VALIDATION_WITH_PYTHON "Enable the spacepackets Python bridge" OFF)
 option(USLP_VALIDATION_EMBED_PYTHON "Embed the Python interpreter instead of using subprocess RPC" OFF)
 option(USLP_VALIDATION_ENABLE_TESTS "Enable validation-specific unit tests" ${BUILD_TESTING})
