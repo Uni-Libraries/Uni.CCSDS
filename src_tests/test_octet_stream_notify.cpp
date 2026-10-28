@@ -11,6 +11,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -60,7 +61,11 @@ TEST_CASE("OCTET_STREAM_Notify: QUEUED then SENT", "[uslp][octet_stream][notify]
     p.vcf_seq_count_len_octets = 0;
     p.vcf_exp_count_len_octets = 1;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x5151, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 2;
@@ -106,7 +111,11 @@ TEST_CASE("OCTET_STREAM_Notify: REJECTED_UNSUPPORTED for fixed-length VC", "[usl
     p.min_frame_length = 256; // fixed-length
     p.fecf_capability = false;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x5252, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 1;
@@ -139,7 +148,11 @@ TEST_CASE("OCTET_STREAM_Notify: REJECTED_INVALID on zero-length", "[uslp][octet_
     p.min_frame_length = 0;
     p.fecf_capability = false;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x5353, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 4;

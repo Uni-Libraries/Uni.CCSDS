@@ -20,6 +20,7 @@
  *  - The entire frame (PH..FECF if present) is delivered to the VCF.indication per §3.9.2.2.
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.ccsds
@@ -87,7 +88,11 @@ TEST_CASE("VCF.indication delivers frame, GVCID, and Frame Loss Flag derived fro
     const uint8_t VCID = 7;
     const uint8_t MAP  = 3;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, VCID, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_map(&ctx, VCID, MAP, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);

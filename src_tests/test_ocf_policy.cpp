@@ -7,6 +7,7 @@
  *  - Table 5-3 VC Managed Parameters (USLP-139, USLP-140)
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 #include "uni_ccsds.h"
 #include "uni_ccsds_uslp_internal.h"
@@ -30,7 +31,11 @@ TEST_CASE("USLP-139: Variable-length OCF allowed gate", "[uslp][ocf][policy][var
   base.insert_zone_capability = false; base.truncated_frame_capable=false;
   base.max_sdu_length = 512;
 
-  uni_uslp_context_t ctx{};
+  // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+  auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+  uni_uslp_context_t& ctx = *ctx_owner;
   REQUIRE(uni_ccsds_uslp_init(&ctx, 0x4242, &base) == UNI_USLP_SUCCESS);
   const uint8_t VC=1, MAP=2;
   // VC params: ocf allowed variable = false
@@ -89,7 +94,11 @@ TEST_CASE("USLP-140: Fixed-length OCF required enforcement", "[uslp][ocf][policy
   base.insert_zone_capability = false; base.truncated_frame_capable=false;
   base.max_sdu_length = 512;
 
-  uni_uslp_context_t ctx{};
+  // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+  auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+  uni_uslp_context_t& ctx = *ctx_owner;
   REQUIRE(uni_ccsds_uslp_init(&ctx, 0x5151, &base) == UNI_USLP_SUCCESS);
   const uint8_t VC=2, MAP=1;
   auto vc_params = base; vc_params.ocf_required_fixed = true;

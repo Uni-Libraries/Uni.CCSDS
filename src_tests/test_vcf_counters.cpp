@@ -17,6 +17,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 // uni.ccsds
 #include "uni_ccsds.h"
@@ -80,7 +81,11 @@ TEST_CASE("VCF-SEQ: TX emits 1-octet counter, RX sync and in-order without gaps"
     global.blocking_permitted = false;
     global.max_sdu_length = 1024;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x4242, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 2;
@@ -147,7 +152,11 @@ TEST_CASE("VCF-SEQ: gap detection when counter skips ahead; duplicate does not a
     global.fecf_capability = false; // so we can tamper PH without recalculating CRC
     global.max_sdu_length = 1024;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x5151, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 4;

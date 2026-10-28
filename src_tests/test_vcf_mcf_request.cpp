@@ -14,6 +14,7 @@
  *    then submit it to VCF/MCF.request (no modification applied by provider).
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.ccsds
@@ -96,7 +97,11 @@ TEST_CASE("VCF.request provider bridging forwards frame unchanged to underlying 
     const uint8_t VCID = 10;
     const uint8_t MAP  = 1;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, VCID, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_map(&ctx, VCID, MAP, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);
@@ -146,7 +151,11 @@ TEST_CASE("MCF.request provider bridging forwards frame unchanged to underlying 
     const uint8_t VCID = 3;
     const uint8_t MAP  = 2;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, VCID, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_map(&ctx, VCID, MAP, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);

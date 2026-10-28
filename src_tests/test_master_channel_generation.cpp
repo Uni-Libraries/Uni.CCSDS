@@ -19,6 +19,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.ccsds
@@ -69,7 +70,9 @@ TEST_CASE("Master Channel Generation: build_next_frame composes MC→VC→MAP an
 
     // Initialize context with a specific SCID to check PH assignment
     const uint16_t SCID = 0x7E01;
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &params) == UNI_USLP_SUCCESS);
 
     // Configure one VC and one MAP (MAPA service)

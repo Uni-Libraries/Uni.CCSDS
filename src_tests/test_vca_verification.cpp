@@ -15,6 +15,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 #include "uni_ccsds_uslp_internal.h"
@@ -71,7 +72,11 @@ TEST_CASE("VCA + SDLS HMAC: Verification Status Code = SUCCESS (USLP-35, C2)", "
     const uint8_t VCID = 7;
     const uint8_t MAP  = 2;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x6A6A, &p) == UNI_USLP_SUCCESS);
 
     // Register built-in SDLS engine and RX work buffer

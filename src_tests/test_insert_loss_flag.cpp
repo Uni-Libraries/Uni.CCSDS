@@ -17,6 +17,7 @@
  *     2) C&S loss signaled before accept: expect in_sdu_loss_flag=true.
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.ccsds
@@ -67,7 +68,11 @@ TEST_CASE("INSERT.indication v2 delivers IN_SDU Loss Flag derived from C&S signa
     global.truncated_frame_capable = false;
     global.max_sdu_length = 512;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x5A5A, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 11;

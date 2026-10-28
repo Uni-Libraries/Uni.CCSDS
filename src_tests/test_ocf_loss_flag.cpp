@@ -13,6 +13,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -65,7 +66,11 @@ TEST_CASE("OCF_SDU Loss Flag: false without C&S signal, true when signaled (USLP
     const uint8_t VCID = 3;
     const uint8_t MAP  = 1;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x4C4C, &p) == UNI_USLP_SUCCESS);
 
     auto vc_params = p;

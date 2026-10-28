@@ -18,6 +18,7 @@
  * - Optional items USLP-13 (Notification Type) and USLP-14 (Packet Quality Indicator) are not implemented.
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -78,7 +79,11 @@ TEST_CASE("MAPP: build/accept round-trip; TFDF Rule 000 with FHP=0; QoS mapping"
     uni_uslp_managed_params_t p{};
     configure_common_varlen_no_fecf(p);
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x4242, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VC = 1, MAP = 2;
@@ -160,7 +165,11 @@ TEST_CASE("MAPP + SDLS HMAC: verify tag, replay reject, tamper fail", "[mapp][sd
     uni_uslp_managed_params_t p{};
     configure_common_varlen_no_fecf(p); // disable FECF to allow tamper testing
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x5151, &p) == UNI_USLP_SUCCESS);
 
     // Register built-in SDLS engine
@@ -263,7 +272,11 @@ TEST_CASE("MAPP: MAPP.indication delivers PQI=COMPLETE, ver=NOT_APPLICABLE", "[m
     uni_uslp_managed_params_t p{};
     configure_common_varlen_no_fecf(p);
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x4243, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VC = 2, MAP = 3;
@@ -342,7 +355,11 @@ TEST_CASE("MAPP: Packet Transfer parameters — Valid PVNs mask and Maximum Pack
     uni_uslp_managed_params_t p_vc{};
     configure_common_varlen_no_fecf_base(p_vc);
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x4244, &p_vc) == UNI_USLP_SUCCESS);
 
     const uint8_t VC = 4, MAP = 1;
@@ -392,7 +409,11 @@ TEST_CASE("MAPP: Deliver incomplete packets using FHP (USLP-150)", "[mapp][incom
     uni_uslp_managed_params_t p_vc{};
     configure_common_varlen_no_fecf_base(p_vc);
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x4245, &p_vc) == UNI_USLP_SUCCESS);
 
     const uint8_t VC = 5, MAP = 2;

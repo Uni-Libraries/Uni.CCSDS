@@ -18,6 +18,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -136,7 +137,11 @@ TEST_CASE("VCF-EXP: TX omits Expedited VCF Count (vcf_count_len=0) while Bypass=
     uni_uslp_managed_params_t global{};
     configure_common_varlen_no_fecf(global);
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x5252, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 6;
@@ -188,7 +193,11 @@ TEST_CASE("VCF-EXP: RX continuity when Expedited VCF Count is present", "[uslp][
     uni_uslp_managed_params_t global{};
     configure_common_varlen_no_fecf(global);
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x5353, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 3;
@@ -231,7 +240,11 @@ TEST_CASE("MAPA QoS: PH.Bypass=0 (No QoS on MAPA.request per §3.5.2.5; USLP-27 
     uni_uslp_managed_params_t p{};
     configure_common_varlen_no_fecf(p);
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x5454, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VC = 1, MAP = 5;

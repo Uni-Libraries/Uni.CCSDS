@@ -18,6 +18,8 @@
   - CRC append/verify: `uni_crypto_crc16_ccitt_append()`, `uni_crypto_crc16_ccitt_verify()`
 
 ## 2. Memory model and lifetime
+- `uni_uslp_context_t` holds the state of all 64 VCs and their MAPs plus the SDLS SA table: about 1.2 MiB on 64-bit
+  hosts. Give it static or heap storage — not the stack (1 MiB by default on Windows).
 - The library does not allocate; all buffers are supplied by the caller. The crypto backend (Mbed TLS) may allocate
   when an SDLS Security Association is keyed; call `uni_ccsds_uslp_free()` on every context that had SAs.
 - TX queueing is zero‑copy: send APIs store pointers to your SDU; keep the SDU buffer alive until build returns.

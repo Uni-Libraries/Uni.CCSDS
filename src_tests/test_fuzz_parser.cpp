@@ -14,6 +14,7 @@
  * - Annex B (FECF)
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 // uni.ccsds
 #include "uni_ccsds.h"
@@ -126,7 +127,11 @@ TEST_CASE("Parser robustness against random mutations (variable-length, Rule '11
     p.truncated_frame_capable = false;
     p.max_sdu_length = 1024;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x4D4D, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 4;

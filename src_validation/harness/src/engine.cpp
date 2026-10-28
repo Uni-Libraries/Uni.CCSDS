@@ -1,6 +1,7 @@
 #include "uslp_validation/engine.hpp"
 #include "uslp_validation/scenario.hpp"
 
+#include <memory>
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -230,7 +231,9 @@ bool local_encode_frame(const uslp::validation::Scenario& scn,
                         const std::vector<std::uint8_t>& payload,
                         std::vector<std::uint8_t>& out_frame,
                         std::string& diag) {
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+    uni_uslp_context_t& ctx = *ctx_owner;
     const uint16_t scid = static_cast<uint16_t>(get_attr_int(scn, "scid", 42));
     const uint8_t  vcid = static_cast<uint8_t>(get_attr_int(scn, "vcid", 0));
     const uint8_t  mapid= static_cast<uint8_t>(get_attr_int(scn, "mapid", 0));
@@ -318,7 +321,9 @@ bool local_decode_frame(const uslp::validation::Scenario& scn,
                         const std::vector<std::uint8_t>& frame,
                         std::vector<std::uint8_t>& out_payload,
                         std::string& diag) {
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+    uni_uslp_context_t& ctx = *ctx_owner;
     const uint16_t scid = static_cast<uint16_t>(get_attr_int(scn, "scid", 42));
     const uint8_t  vcid = static_cast<uint8_t>(get_attr_int(scn, "vcid", 0));
     const uint8_t  mapid= static_cast<uint8_t>(get_attr_int(scn, "mapid", 0));

@@ -16,6 +16,7 @@
  *  - Verify MCID equals (UNI_USLP_TFVN<<16)|SCID in each callback.
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.ccsds
@@ -68,7 +69,11 @@ TEST_CASE("MCF.indication delivers frame and MCID; Frame Loss Flag follows C&S s
     const uint8_t VCID = 4;
     const uint8_t MAP  = 2;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &p) == UNI_USLP_SUCCESS);
 
     // Configure VC + MAPA

@@ -12,6 +12,7 @@
  * - CCSDS 732.1-B-3 §4.3.7.4 Receiving VC Procedures (continuity handling)
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 // uni.ccsds
 #include "uni_ccsds.h"
@@ -76,7 +77,11 @@ TEST_CASE("MAPA Loss Flag from VCF-SEQ gap", "[uslp][mapa][loss-flag][seq]")
     global.blocking_permitted = false;
     global.max_sdu_length = 1024;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x2A2A, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 1;

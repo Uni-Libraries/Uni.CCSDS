@@ -75,7 +75,8 @@ int main(int argc, char** argv) {
     const uint8_t VCID = 2;
     const uint8_t MAP  = 1;
 
-    uni_uslp_context_t ctx;
+    /* The context is > 1 MiB (all VC and MAP state): static storage, not the stack. */
+    static uni_uslp_context_t ctx;
     memset(&ctx, 0, sizeof(ctx));
     if (uni_ccsds_uslp_init(&ctx, SCID, &p) != UNI_USLP_SUCCESS) {
         fprintf(stderr, "init failed\n");

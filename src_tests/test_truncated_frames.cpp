@@ -16,6 +16,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 // uni.ccsds
 #include "uni_ccsds.h"
@@ -83,7 +84,11 @@ TEST_CASE("Build+Accept truncated frame: minimum length (6 octets)", "[uslp][tru
 
     auto global = base_params_varlen();
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &global) == UNI_USLP_SUCCESS);
 
     auto vc_params = global;
@@ -124,7 +129,11 @@ TEST_CASE("Build+Accept truncated frame: maximum length (32 octets)", "[uslp][tr
 
     auto global = base_params_varlen();
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &global) == UNI_USLP_SUCCESS);
 
     auto vc_params = global;
@@ -163,7 +172,11 @@ TEST_CASE("Build truncated: SDU size mismatch produces error", "[uslp][truncated
 
     auto global = base_params_varlen();
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &global) == UNI_USLP_SUCCESS);
 
     auto vc_params = global;
@@ -192,7 +205,11 @@ TEST_CASE("Accept truncated: invalid TFDF rule rejected", "[uslp][truncated][err
 
     auto global = base_params_varlen();
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &global) == UNI_USLP_SUCCESS);
 
     auto vc_params = global;
@@ -227,7 +244,11 @@ TEST_CASE("Accept truncated: capability disabled causes reject", "[uslp][truncat
 
     auto global = base_params_varlen();
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &global) == UNI_USLP_SUCCESS);
 
     // VC configured but truncated not enabled
@@ -241,7 +262,9 @@ TEST_CASE("Accept truncated: capability disabled causes reject", "[uslp][truncat
 
     // Build a valid truncated frame by temporarily enabling capability on a scratch VC
     // Instead, construct using the public builder with a separate context to avoid internal access.
-    uni_uslp_context_t ctx2{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+    auto ctx2_owner = std::make_unique<uni_uslp_context_t>();
+    uni_uslp_context_t& ctx2 = *ctx2_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx2, SCID, &global) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx2, VCID, &vc_params) == UNI_USLP_SUCCESS);
     // Enable capability for builder

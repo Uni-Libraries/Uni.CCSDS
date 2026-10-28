@@ -13,6 +13,7 @@
  * - CCSDS 732.1-B-3 §4.1.2 Primary Header (OCF flag)
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 // uni.ccsds
 #include "uni_ccsds.h"
@@ -78,7 +79,11 @@ TEST_CASE("OCF: emit in variable-length frame and extract on accept", "[uslp][oc
     global.truncated_frame_capable = false;
     global.max_sdu_length = 1024;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x4242, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 1;
@@ -141,7 +146,11 @@ TEST_CASE("Fixed-length frame with Insert Zone and exact SDU fit", "[uslp][inser
     global.truncated_frame_capable = false;
     global.max_sdu_length = 4096;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x5151, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 3;

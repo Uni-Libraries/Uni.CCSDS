@@ -11,6 +11,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -137,7 +138,11 @@ TEST_CASE("Octet Stream expedited: variable-length, Rule '011', bypass=1; VCF-EX
     p.vcf_seq_count_len_octets = 0;  // only EXP used in this test
     p.vcf_exp_count_len_octets = 1;  // 1-octet counter for EXP
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x4444, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 3;
@@ -198,7 +203,11 @@ TEST_CASE("Octet Stream sequence-controlled: variable-length, bypass=0 uses VCF-
     p.vcf_seq_count_len_octets = 2; // use SEQ counter with 2 octets
     p.vcf_exp_count_len_octets = 0;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x4747, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 5;
@@ -239,7 +248,11 @@ TEST_CASE("Octet Stream rejected on fixed-length frames per §2.2.4.6/§2.2.5(g)
     p.min_frame_length = 256; // fixed-length
     p.fecf_capability = false;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x4A4A, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 1;
@@ -262,7 +275,11 @@ TEST_CASE("Octet Stream Loss Flag from VCF-EXP gap", "[uslp][octet_stream][loss-
     p.vcf_seq_count_len_octets = 0;
     p.vcf_exp_count_len_octets = 1;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x4D4D, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 10;

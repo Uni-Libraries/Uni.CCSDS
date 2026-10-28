@@ -17,6 +17,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 // uni.ccsds
 #include "uni_ccsds.h"
@@ -76,7 +77,11 @@ TEST_CASE("Build and accept MAPA frame (variable-length, Rule '111', with FECF)"
     global.blocking_permitted = false;
     global.max_sdu_length = 2048;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x4242, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 2;
@@ -127,7 +132,11 @@ TEST_CASE("Build MAPA frame with FECF TX offload append (PH counts FECF, buffer 
     global.fecf_tx_mode = UNI_USLP_FECF_TX_OFFLOAD_APPEND;
     global.max_sdu_length = 2048;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x5555, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 1;
@@ -172,7 +181,11 @@ TEST_CASE("Fixed-length frame with Insert Zone and exact SDU fit", "[frame][fixe
     p.blocking_permitted = false;
     p.max_sdu_length = 256;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x123, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, 0, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_map(&ctx, 0, 0, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);
@@ -227,7 +240,11 @@ TEST_CASE("Fixed-length frame with idle padding", "[frame][fixed][padding]")
     p.blocking_permitted = false;
     p.max_sdu_length = 512;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x123, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, 0, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_map(&ctx, 0, 0, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);
@@ -265,7 +282,11 @@ TEST_CASE("Truncated frame build and accept", "[frame][truncated]")
     p.truncated_frame_length = 20; // 4 PH + 1 TFDF.hdr + 15 TFDZ
     p.max_sdu_length = 32;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x123, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, 0, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_map(&ctx, 0, 0, UNI_USLP_SERVICE_MAPA, &p) == UNI_USLP_SUCCESS);

@@ -13,6 +13,7 @@
  * We enforce that the IN_SDU provided equals the configured Insert Zone length (no padding invented).
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.ccsds
@@ -84,7 +85,11 @@ TEST_CASE("INSERT.request populates fixed-length Insert Zone and triggers INSERT
     global.truncated_frame_capable = false;
     global.max_sdu_length = 1024;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x2222, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 5;
@@ -161,7 +166,11 @@ TEST_CASE("INSERT.request rejected on variable-length physical channel", "[uslp]
     global.truncated_frame_capable = false;
     global.max_sdu_length = 1024;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x3333, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 2;

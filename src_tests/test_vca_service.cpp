@@ -15,6 +15,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -88,7 +89,11 @@ TEST_CASE("VCA: QUEUED then SENT; VCA.indication delivery (Rule '111')", "[uslp]
     p.fecf_capability = false;
     p.vcf_seq_count_len_octets = 1; // exercise VCF update on SEQ path
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x6161, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 6;
@@ -143,7 +148,11 @@ TEST_CASE("VCA_Notify: REJECTED_INVALID on zero-length", "[uslp][vca][invalid]")
     p.min_frame_length = 0;
     p.fecf_capability = false;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, 0x6262, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 2;

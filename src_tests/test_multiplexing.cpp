@@ -17,6 +17,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -92,7 +93,11 @@ TEST_CASE("MAP mux: RR alternates MAP selection in a VC (USLP-96)", "[uslp][mux]
     set_common_varlen(global);
     global.vc_mux_scheme = UNI_USLP_VC_MUX_SINGLE; // single VC focus
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x4242, &global) == UNI_USLP_SUCCESS);
 
     const uint8_t VC = 1;
@@ -153,7 +158,11 @@ TEST_CASE("VC mux: RR alternates VC selection when multiple VCs have pending SDU
     set_common_varlen(global);
     global.vc_mux_scheme = UNI_USLP_VC_MUX_RR; // VC RR across channel
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x5151, &global) == UNI_USLP_SUCCESS);
 
     // VC1
@@ -213,7 +222,11 @@ TEST_CASE("Demultiplexing on RX: frames routed by MC/VC/MAP to correct SAPs (USL
     set_common_varlen(global);
     global.vc_mux_scheme = UNI_USLP_VC_MUX_SINGLE;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x6161, &global) == UNI_USLP_SUCCESS);
 
     // VC=3 MAP=2 and VC=4 MAP=1, both MAPA services

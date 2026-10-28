@@ -14,6 +14,7 @@
  * References: CCSDS 732.1-B-3 §5 (Table 5-3), §4.1.5 (OCF)
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 #include "uni_ccsds.h"
 #include "uni_ccsds_uslp_internal.h"
@@ -42,7 +43,11 @@ TEST_CASE("VC managed params: COP/CLCW/MAP mux/Repetitions/Delays (USLP-132..USL
     base.max_tfdf_completion_delay = 250; // USLP-143 (record only)
     base.max_inter_frame_delay = 500;     // USLP-144 (record only)
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x4242, &base) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 7;

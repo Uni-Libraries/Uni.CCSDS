@@ -11,6 +11,7 @@
  *  - Async_Notify.indication delivery to registered callback
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.ccsds
@@ -124,7 +125,11 @@ TEST_CASE("Directive.request COP-1 delivers Directive_Notify QUEUED then SENT", 
     const uint16_t SCID = 0x4A4A;
     const uint8_t VCID = 5;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, VCID, &p) == UNI_USLP_SUCCESS);
 
@@ -175,7 +180,11 @@ TEST_CASE("Directive.request COP-1 is UNSUPPORTED when VCF.request exists on sam
     const uint16_t SCID = 0x3030;
     const uint8_t VCID = 6;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, VCID, &p) == UNI_USLP_SUCCESS);
 
@@ -193,7 +202,11 @@ TEST_CASE("Directive.request COP-P delivers Directive_Notify and respects MCF co
     p.min_frame_length = 0;
     const uint16_t SCID = 0x5151;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &p) == UNI_USLP_SUCCESS);
 
     // Case A: No MCF registered => success
@@ -227,7 +240,11 @@ TEST_CASE("Async_Notify.indication delivery to registered callback", "[uslp][dir
     const uint16_t SCID = 0x2222;
     const uint8_t VCID = 9;
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, SCID, &p) == UNI_USLP_SUCCESS);
     REQUIRE(uni_ccsds_uslp_configure_vc(&ctx, VCID, &p) == UNI_USLP_SUCCESS);
 

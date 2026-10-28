@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -73,7 +74,9 @@ inline uni_uslp_managed_params_t varlen_params() {
 
 /** One USLP context with SDLS on a VC, delivering MAPA SDUs of every MAP 0..15 to `received`. */
 struct Endpoint {
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+    std::unique_ptr<uni_uslp_context_t> ctx_owner = std::make_unique<uni_uslp_context_t>();
+    uni_uslp_context_t& ctx = *ctx_owner;
     std::vector<uint8_t> work = std::vector<uint8_t>(16384);
     struct Delivery {
         uint8_t vcid;

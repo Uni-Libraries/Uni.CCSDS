@@ -15,6 +15,7 @@
  * - USLP-176–179: Managed params — presence/length of SecHeader/SecTrailer used for sizing and validation
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -67,7 +68,11 @@ TEST_CASE("SDLS HMAC: protect/unprotect MAPA round-trip; trailer tamper detected
     uni_uslp_managed_params_t p{};
     configure_common_varlen_no_fecf(p);
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x5151, &p) == UNI_USLP_SUCCESS);
 
     // Register built-in SDLS callbacks

@@ -17,6 +17,7 @@
  * © 2025 Uni-Libraries contributors — MIT License
  */
 
+#include <memory>
 #include <catch2/catch_test_macros.hpp>
 
 // uni.CCSDS
@@ -95,7 +96,11 @@ TEST_CASE("VCP: QUEUED then SENT; VCP.indication delivery; Rule '000' and QoS ma
     uni_uslp_managed_params_t p{};
     configure_common_varlen_no_fecf(p);
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x7001, &p) == UNI_USLP_SUCCESS);
 
     const uint8_t VCID = 7;
@@ -194,7 +199,11 @@ TEST_CASE("VCP + SDLS HMAC: deliver Verification Status Code (C2), replay reject
     uni_uslp_managed_params_t p{};
     configure_common_varlen_no_fecf(p); // FECF disabled for tamper testing
 
-    uni_uslp_context_t ctx{};
+    // The context is > 1 MiB: heap-allocate it (1 MiB default stack on Windows).
+
+    auto ctx_owner = std::make_unique<uni_uslp_context_t>();
+
+    uni_uslp_context_t& ctx = *ctx_owner;
     REQUIRE(uni_ccsds_uslp_init(&ctx, /*SCID*/ 0x7002, &p) == UNI_USLP_SUCCESS);
 
     // Register built-in SDLS engine
