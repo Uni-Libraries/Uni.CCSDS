@@ -5,6 +5,6 @@ if(NOT TARGET uni_crypto)
     CPMAddPackage(
             NAME uni.crypto
             GITHUB_REPOSITORY Uni-Libraries/Uni.Crypto
-            GIT_TAG 4c58ff9fd8184f735aaadfdd15c7e5023130267e
+            GIT_TAG 3d75cfb8cfa40e6854ec2d6b92fea2edbd43dc1b
     )
 endif()

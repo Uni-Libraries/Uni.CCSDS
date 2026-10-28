@@ -34,15 +34,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Mbed TLS (Linux)
+      - name: Install Ninja (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends libmbedtls-dev ninja-build
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends ninja-build
 
-      - name: Install Mbed TLS (Windows)
-        if: runner.os == 'Windows'
+      # Mbed TLS 3.x from vcpkg everywhere: Ubuntu 24.04 packages only the end-of-life 2.28 series.
+      - name: Install Mbed TLS 3.x
         shell: bash
         run: |
-          vcpkg install mbedtls:x64-windows
+          triplet=$([ "$RUNNER_OS" = "Windows" ] && echo x64-windows || echo x64-linux)
+          vcpkg install "mbedtls:$triplet"
           echo "CMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" >> "$GITHUB_ENV"
 
       - name: Set up MSVC environment
@@ -71,7 +72,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends libmbedtls-dev ninja-build clang
+      - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends ninja-build clang
+      - name: Install Mbed TLS 3.x
+        run: |
+          vcpkg install mbedtls:x64-linux
+          echo "CMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" >> "$GITHUB_ENV"
       - name: Configure
         # The vendored NASA reference has signed-overflow UB of its own; the harness runs in the release job.
         run: >-
@@ -88,7 +93,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends libmbedtls-dev ninja-build
+      - run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends ninja-build
+      - name: Install Mbed TLS 3.x
+        run: |
+          vcpkg install mbedtls:x64-linux
+          echo "CMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" >> "$GITHUB_ENV"
       - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build --parallel
       - name: Run harness
