@@ -14,6 +14,8 @@ Version 2.0.0 — see [docs/uslp_sdls.md](docs/uslp_sdls.md#migration-from-1x) f
 - SDLS: Security Association table with 16-bit SPI, AES-GCM / AES-CCM / HMAC-SHA-256, Annex E baseline profile,
   authenticated Primary and Security Headers, anti-replay per §4.2.4.4 (plus an opt-in sliding window for diversity
   reception), transmit SN persistence and restore, per-reason rejection codes and counters.
+- TM synchronization and channel coding (`uni_ccsds_tm.h`, CCSDS 131.0-B-5): Attached Sync Marker, pseudo-randomizer,
+  rate 1/2 K = 7 convolutional encoder, and the Eb/N0 estimate from a channel symbol error rate.
 - PICS: [docs/uslp_pics.md](docs/uslp_pics.md) (USLP) and [docs/uslp_sdls.md](docs/uslp_sdls.md) (SDLS, including the
   list of deviations from 355.0-B-2).
 

@@ -19,6 +19,7 @@ add_executable(uni_ccsds_test)
 target_sources(uni_ccsds_test PRIVATE
     uni_ccsds_tests.cpp
     test_crc16_lfsr.cpp
+    test_tm_coding.cpp
     test_primary_header.cpp
     test_tfdf_header.cpp
     test_frame_build_parse.cpp

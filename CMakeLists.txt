@@ -61,6 +61,7 @@ target_include_directories(uni_ccsds PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 target_sources(uni_ccsds PRIVATE
     src/uni_ccsds_lfsr_oid.c
+    src/uni_ccsds_tm.c
     src/uni_ccsds_uslp_primary_header.c
     src/uni_ccsds_uslp_sdls.c
     src/uni_ccsds_uslp_status.c
@@ -90,6 +91,11 @@ endif()
 
 if(PROJECT_IS_TOP_LEVEL)
     target_link_libraries(uni_ccsds PUBLIC uni_crypto)
+endif()
+
+# The TM link quality estimate uses the C math library.
+if(UNIX)
+    target_link_libraries(uni_ccsds PRIVATE m)
 endif()
 
 
